@@ -14,7 +14,10 @@ for (const g of games) {
     await cp(src, join(out, g.slug), { recursive: true }); versions[g.taskId] = { ...g, commit: 'local' }; continue;
   }
   const dir = await mkdtemp(join(tmpdir(), 'kudlab-game-'));
-  execFileSync('git', ['clone', '--quiet', '--depth', '1', '--branch', g.ref, g.repo, dir], { stdio: 'inherit' });
+  // ref puede ser una rama o un commit fijo (40 hex): un commit no cambia aunque el repositorio del juego avance.
+  const git = (...a) => execFileSync('git', ['-C', dir, ...a], { stdio: 'inherit' });
+  git('init', '--quiet'); git('remote', 'add', 'origin', g.repo);
+  git('fetch', '--quiet', '--depth', '1', 'origin', g.ref); git('checkout', '--quiet', 'FETCH_HEAD');
   const commit = execFileSync('git', ['-C', dir, 'rev-parse', 'HEAD']).toString().trim();
   await cp(join(dir, 'frontend'), join(out, g.slug), { recursive: true, filter: s => !s.includes('test_host.html') });
   await rm(dir, { recursive: true, force: true });
