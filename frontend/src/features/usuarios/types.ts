@@ -45,11 +45,19 @@ export function parseAccountPage(value: unknown): AccountPage | undefined {
   if (items.some((item) => !item)) return;
   return { items: items as Account[], total: Number(value.total), limit: Number(value.limit), offset: Number(value.offset) };
 }
-export const validInstitutionalEmail = (value: string) => /^[^\s@]+@[^\s@]+\.edu\.co$/i.test(value.trim());
+// Debe coincidir con ALLOWED_EMAIL_DOMAINS de la API (VITE_ALLOWED_EMAIL_DOMAINS al compilar). Por defecto, .edu.co.
+const allowedDomains = ((import.meta.env?.VITE_ALLOWED_EMAIL_DOMAINS as string | undefined) ?? '').split(',').map(d => d.trim().toLowerCase()).filter(Boolean);
+export const institutionalOnly = allowedDomains.length === 0;
+export const emailRuleText = institutionalOnly ? 'terminado en .edu.co' : `de un dominio permitido (${allowedDomains.join(', ')})`;
+export const validInstitutionalEmail = (value: string) => {
+  const v = value.trim(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return false;
+  const domain = v.split('@')[1]!.toLowerCase();
+  return (institutionalOnly ? ['.edu.co'] : allowedDomains).some(d => d === '*' || (d.startsWith('.') ? domain.endsWith(d) : domain === d));
+};
 export const validNewPassword = (value: string) => value.length >= 8 && value.length <= 128 && /[A-Z]/.test(value) && /[a-z]/.test(value) && /[0-9]/.test(value);
 export function accountIssues(name: string, email: string): { name?: string; email?: string } {
   return { ...(!name.trim() || name.trim().length > 200 ? { name: 'Ingresa un nombre de entre 1 y 200 caracteres.' } : {}),
-    ...(!validInstitutionalEmail(email) ? { email: 'Ingresa un correo institucional terminado en .edu.co.' } : {}) };
+    ...(!validInstitutionalEmail(email) ? { email: `Ingresa un correo ${emailRuleText}.` } : {}) };
 }
 export function editFields(account: Account, name: string, email: string): { name?: string; email?: string } {
   const normalized = email.trim().toLowerCase();

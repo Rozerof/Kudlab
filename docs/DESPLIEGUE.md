@@ -48,7 +48,9 @@ Servicios (todos con plan gratuito):
    - `DATABASE_URL` = la `POSTGRES_URI` del paso 2. Si Northflank exige SSL, agrega `?sslmode=require` al final.
    - `MAIL_USER` = la cuenta Gmail; `MAIL_PASSWORD` = la contraseña de aplicación (16 letras, sin espacios);
      `MAIL_FROM` = la misma cuenta Gmail.
-   - `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_EMAIL` (**debe terminar en `.edu.co`**) y
+   - `ALLOWED_EMAIL_DOMAINS` (por ejemplo `.edu.co,gmail.com`): dominios aceptados para cuentas; sin ella solo se aceptan correos `.edu.co`.
+     Pon el mismo valor en `VITE_ALLOWED_EMAIL_DOMAINS` del proyecto Pages docente.
+   - `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_EMAIL` (de un dominio permitido) y
      `BOOTSTRAP_ADMIN_PASSWORD` (8+ caracteres con mayúscula, minúscula y número). Solo se usan la primera vez.
 5. Despliega. Al arrancar, el contenedor ejecuta las migraciones y crea el administrador.
    Copia la URL pública del servicio (por ejemplo `https://p01--api--xxxx.code.run`): es el **origen de la API**.

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { UsuariosApi } from '../api.ts';
 import type { RecoveryTicket } from '../navigation.ts';
-import { validInstitutionalEmail } from '../types.ts';
+import { emailRuleText, validInstitutionalEmail } from '../types.ts';
 import { recoveryPasswordIssues } from './recovery-input.ts';
 import { useMutation } from '../hooks';
 import { ActionLink, Notice } from '../shared';
@@ -30,7 +30,7 @@ export function Recovery({ api, confirm, ticket }: { api: UsuariosApi; confirm: 
     event.preventDefault();
     if (sending.current || mutation.pending || unusable || uncertain) return;
     if (!confirm) {
-      if (!validInstitutionalEmail(email)) { setIssues({ email: 'Ingresa un correo institucional terminado en .edu.co.' }); emailInput.current?.focus(); return; }
+      if (!validInstitutionalEmail(email)) { setIssues({ email: `Ingresa un correo ${emailRuleText}.` }); emailInput.current?.focus(); return; }
       setIssues({});
       sending.current = true;
       try { await mutation.run((signal) => api.requestRecovery(email, signal)); }
@@ -78,13 +78,13 @@ export function Recovery({ api, confirm, ticket }: { api: UsuariosApi; confirm: 
         {uncertain ? confirm ? 'El cambio podría haberse aplicado. No lo repetiremos automáticamente: comprueba tu acceso con la nueva contraseña.' :
           'La solicitud podría haberse procesado y el correo aún podría llegar. Revisa tu bandeja antes de solicitar otro enlace.' :
           confirm ? 'No se confirmó el cambio. Vuelve a escribir una contraseña que cumpla los requisitos y su confirmación.' :
-            'Utiliza el correo institucional vigente de tu cuenta, terminado en .edu.co.'}
+            `Utiliza el correo vigente de tu cuenta, ${emailRuleText}.`}
       </Notice>}
       {Object.keys(issues).length > 0 && <Notice title="Revisa los datos">{Object.values(issues).join(' ')}</Notice>}
       <form className="auth-form" onSubmit={submit} noValidate aria-busy={mutation.pending}>
         {!confirm ? <div className="auth-field"><Label htmlFor="recovery-email">Correo institucional</Label>
           <Input ref={emailInput} id="recovery-email" type="email" name="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} aria-invalid={Boolean(issues.email)} aria-describedby="recovery-email-help" />
-          <p id="recovery-email-help" className="text-sm">{issues.email ?? 'El correo con el que accedes a Kudlab, terminado en .edu.co.'}</p></div> : <>
+          <p id="recovery-email-help" className="text-sm">{issues.email ?? `El correo con el que accedes a Kudlab, ${emailRuleText}.`}</p></div> : <>
           <div className="auth-field"><Label htmlFor="new-password">Nueva contraseña</Label>
             <Input ref={password} id="new-password" type={showPasswords ? 'text' : 'password'} name="newPassword" autoComplete="new-password" required maxLength={128} aria-invalid={Boolean(issues.password)} aria-describedby="new-password-help" />
             <p id="new-password-help" className="text-sm">{issues.password ?? 'Entre 8 y 128 caracteres, con una mayúscula (A–Z), una minúscula (a–z) y un número.'}</p></div>

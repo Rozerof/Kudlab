@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import type { UsuariosApi } from '../api.ts';
-import { accountIssues, editFields } from '../types.ts';
+import { accountIssues, editFields, emailRuleText } from '../types.ts';
 import type { Account } from '../types.ts';
 import { useMutation, useQuery } from '../hooks';
 import { ActionLink, Delivery, InlineHelp, Loading, Notice, ResultError } from '../shared';
@@ -81,7 +81,7 @@ function Editor({ api, account, review, refreshing, locked }: { api: UsuariosApi
           <p id="account-name-help" className="text-sm">{nameIssue ?? 'Máximo 200 caracteres.'}</p></div>
         <div className="auth-field"><Label htmlFor="account-email">{editing ? 'Correo' : 'Correo institucional'}</Label>
           <Input ref={emailInput} id="account-email" name="email" type="email" autoComplete="email" required disabled={mutation.pending || blocked || refreshing || locked} value={email} onChange={(event) => setEmail(event.target.value)} aria-invalid={Boolean(emailIssue)} aria-describedby="account-email-help" />
-          <p id="account-email-help" className="text-sm">{emailIssue ?? 'Debe terminar en .edu.co. El cambio de correo puede requerir confirmación.'}</p></div>
+          <p id="account-email-help" className="text-sm">{emailIssue ?? `Debe ser un correo ${emailRuleText}. El cambio de correo puede requerir confirmación.`}</p></div>
         {!editing && <p>Rol inicial: <strong>Docente (TEACHER)</strong></p>}
         <div className="staff-actions"><Button type="submit" disabled={mutation.pending || blocked || refreshing || locked}>{mutation.pending ? <LoaderCircle aria-hidden="true" /> : editing ? <Save aria-hidden="true" /> : <UserPlus aria-hidden="true" />}
           {mutation.pending ? 'Procesando…' : editing ? 'Guardar cambios' : 'Invitar profesor'}</Button><ActionLink href={back}>Cancelar</ActionLink></div>

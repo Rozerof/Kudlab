@@ -37,12 +37,15 @@ const api = {
   MAIL_MODE: 'smtp',
   MAIL_HOST: 'smtp.gmail.com',
   MAIL_PORT: '465',
+  // Dominios de correo permitidos para cuentas (quitar gmail.com para exigir solo correos institucionales).
+  ALLOWED_EMAIL_DOMAINS: '.edu.co,gmail.com',
 };
 console.log('# ---- Northflank: variables del servicio API (además de DATABASE_URL, MAIL_USER, MAIL_PASSWORD, MAIL_FROM y BOOTSTRAP_ADMIN_*) ----');
 for (const [k, v] of Object.entries(api)) console.log(`${k}=${v}`);
 console.log('\n# ---- Cloudflare Pages: proyecto kudlab-docente (Settings > Variables, Production) ----');
 console.log(`VITE_API_ORIGIN=${teacher}`);
 console.log(`VITE_PLAY_ORIGIN=${play}`);
+console.log('VITE_ALLOWED_EMAIL_DOMAINS=.edu.co,gmail.com');
 console.log('API_UPSTREAM_ORIGIN=<URL pública de la API en Northflank, sin barra final>');
 console.log(`PROXY_SHARED_SECRET=${proxy}`);
 console.log('\n# ---- Cloudflare Pages: proyecto kudlab-play ----');

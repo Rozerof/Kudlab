@@ -7,7 +7,7 @@ type FieldError = { field: ProfileField; reason: string };
 
 const fieldReasons: Record<ProfileField, string> = {
   name: 'Ingrese un nombre completo no vacío',
-  email: 'Ingrese un correo institucional válido terminado en .edu.co',
+  email: process.env.ALLOWED_EMAIL_DOMAINS?.trim() ? 'Ingrese un correo válido de un dominio permitido' : 'Ingrese un correo institucional válido terminado en .edu.co',
   role: 'Seleccione el rol Docente',
   password: 'Use al menos 8 caracteres, una mayúscula, una minúscula y un número',
 };
