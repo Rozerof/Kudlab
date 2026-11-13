@@ -1,6 +1,6 @@
 import { Api, ApiError } from '../delivery/api';
 import { newSecret } from '../contract/canonical';
-import { secretSchema, type AnyContext, type SessionContext } from '../contract/schema';
+import { isExternal, secretSchema, type AnyContext, type SessionContext } from '../contract/schema';
 import { Database, request } from '../storage/database';
 import { Journal, type Snapshot, type Execution, type Outbox } from '../evidence/journal';
 import { normalizeCode } from './access-code';
@@ -37,7 +37,7 @@ export class Session {
       const out = await this.db.get<Outbox>('outbox', recovery.sessionId);
       if (!out || out.envelope.submissionId !== recovery.submissionId) throw new Error('LOCAL_EVIDENCE_NOT_FOUND');
     }
-    const pending = (await this.db.all<Credential>('credentials')).find(c => (c.phase === 'CLAIMING' || kind === 'PLAY' && c.phase === 'READY' && c.context?.capabilities.canStart && Date.parse(c.context.startAllowedUntil) > Date.now()) && !c.operationBlocked && c.access?.kind === kind && c.access.sessionId === recovery?.sessionId);
+    const pending = (await this.db.all<Credential>('credentials')).find(c => (c.phase === 'CLAIMING' || kind === 'PLAY' && c.phase === 'READY' && c.context?.capabilities.canStart && !isExternal(c.context) && Date.parse(c.context.startAllowedUntil) > Date.now()) && !c.operationBlocked && c.access?.kind === kind && c.access.sessionId === recovery?.sessionId);
     if (pending?.lastErrorCode === 'RATE_LIMITED' && (pending.nextAttemptAt ?? 0) > Date.now()) throw new ApiError(429, 'RATE_LIMITED', pending.nextAttemptAt! - Date.now());
     const c: Credential = pending ?? { key: `access:${crypto.randomUUID()}`, claimId: crypto.randomUUID(), runtimeSecret: newSecret(), phase: 'CLAIMING', access: { kind, ...recovery } };
     await this.db.put('credentials', c);

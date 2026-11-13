@@ -219,6 +219,8 @@ export class App {
   private async runExternal(context: ExternalContext): Promise<void> {
     const credential = await this.db!.get<Credential>('credentials', context.sessionId);
     if (!credential) throw new Error('CREDENTIAL_MISSING');
+    // Una credencial de juego externo se usa una sola vez: no debe reutilizarse al canjear otro código.
+    await this.db!.put('credentials', { ...credential, phase: 'START_CONFIRMED', context: { ...context, capabilities: { ...context.capabilities, canStart: false } } });
     const title = EXTERNAL_GAMES[context.taskId].title;
     this.externalActive = true; this.screen = 'running';
     const host = el('section', 'external-host'); host.setAttribute('aria-label', title);
