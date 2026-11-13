@@ -1,0 +1,23 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+.taste-skill/
+.playwright-cli/
+.env
+.env.local
+coverage/
+
+# Personal agent tooling and planning stay outside the published application.
+/AGENTS.md
+/CLAUDE.md
+/.claude
+/.agents
+/.opencode
+/.specify
+/.mcp.json
+/opencode.json
+/opencode.jsonc
+/skills-lock.json
+/especificaciones-juegos
+/docs/superpowers
