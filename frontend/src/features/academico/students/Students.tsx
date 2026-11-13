@@ -69,7 +69,7 @@ export function Students({ api, group, write, reviewed }: { api: StudentsApi; gr
     {!query.result ? <Loading text="Consultando estudiantes" /> : query.result.kind !== 'success' ? <Failure result={query.result} retry={query.reload} /> : !query.result.data.items.length ?
       <Notice title={group ? 'Este curso aún no tiene estudiantes' : 'No hay estudiantes en tus grupos'}><p>{group ? 'Registra el primer estudiante con el botón Registrar estudiante.' : 'Los estudiantes de tus cursos aparecerán aquí.'}</p></Notice> :
       <><p className="text-sm text-muted" role="status">{query.result.data.items.length} {query.result.data.items.length === 1 ? 'estudiante' : 'estudiantes'} {group ? 'en este curso' : 'en tus grupos'}</p><div className="staff-table-region accounts-table-view" role="region" aria-label="Listado de estudiantes, desplazable horizontalmente" tabIndex={0}>
-        <Table aria-label="Estudiantes de tus grupos" className="min-w-[38rem]"><TableHeader><TableRow><TableHead>Código</TableHead><TableHead>Nombres</TableHead><TableHead>Apellidos</TableHead><TableHead>Estado</TableHead><TableHead>Ficha</TableHead></TableRow></TableHeader>
+        <Table aria-label="Estudiantes de tus grupos" className="min-w-[38rem]"><TableHeader><TableRow><TableHead>Código</TableHead><TableHead>Seudónimo</TableHead><TableHead>Iniciales o referencia</TableHead><TableHead>Estado</TableHead><TableHead>Ficha</TableHead></TableRow></TableHeader>
           <TableBody>{query.result.data.items.map((student) => <TableRow key={student.id}>
             <TableCell>{student.studentCode}</TableCell><TableCell>{student.firstName}</TableCell><TableCell>{student.lastName}</TableCell><TableCell className="whitespace-nowrap">{student.isActive ? 'Activo' : 'Inactivo'}</TableCell>
             <TableCell><a href={detailPath(student.id, group?.id)} onClick={navigate} className="staff-link whitespace-nowrap" aria-label={`Ver ficha de ${student.firstName} ${student.lastName}, código ${student.studentCode}`}>Ver ficha</a></TableCell>
@@ -259,7 +259,7 @@ function EditForm({ api, student, locked, group }: { api: StudentsApi; student: 
     {reconciliation.result && reconciliation.result.kind !== 'success' && <Failure result={reconciliation.result} />}
     {observed && <Notice title="Estado observado mediante consulta">
       <Facts student={observed} group={group} /><p>{studentFields.every((field) => observed[field] === input[field].trim()) ? 'Los campos consultados coinciden con el formulario. Esto no demuestra quién realizó el cambio.' : 'Los campos consultados difieren del formulario. Revisa las diferencias en la ficha antes de decidir otro guardado.'}</p>
-      <p>Nombres: {observed.firstName}. Apellidos: {observed.lastName}.</p><Link href={detailPath(student.id, group?.id)}>Revisar ficha actual</Link>
+      <p>Seudónimo: {observed.firstName}. Iniciales o referencia: {observed.lastName}.</p><Link href={detailPath(student.id, group?.id)}>Revisar ficha actual</Link>
     </Notice>}
     <div className="staff-actions">{done ? <Link href={detailPath(student.id, group?.id)} primary>Ver ficha actualizada</Link> : <Button type="submit" disabled={mutation.pending || locked || Boolean(uncertain)}>{mutation.pending ? 'Guardando estudiante…' : 'Guardar cambios'}</Button>}<Link href={detailPath(student.id, group?.id)}>Cancelar</Link></div>
   </form>;
@@ -268,7 +268,7 @@ export function StudentFields({ input, setInput, issues, disabled }: { input: St
   return <>{studentFields.map((field) => <div className="auth-field" key={field}>
       <Label htmlFor={`student-${field}`}>{fieldLabels[field]}</Label>
       <Input id={`student-${field}`} name={field} required autoComplete="off" value={input[field]} disabled={disabled} onChange={(event) => setInput({ ...input, [field]: event.target.value })} aria-invalid={Boolean(issues[field])} aria-describedby={`student-${field}-help${issues[field] ? ` student-${field}-error` : ''}`} />
-      <p id={`student-${field}-help`} className="text-sm">{field === 'studentCode' ? 'Entre 1 y 50 caracteres. Conserva los ceros iniciales y las mayúsculas.' : 'Entre 1 y 100 caracteres.'}</p>
+      <p id={`student-${field}-help`} className="text-sm">{field === 'studentCode' ? 'Entre 1 y 50 caracteres. Conserva los ceros iniciales y las mayúsculas.' : 'No escribas el nombre real del estudiante: usa un seudónimo o iniciales (protección de datos de menores). Entre 1 y 100 caracteres.'}</p>
       {issues[field] && <p id={`student-${field}-error`} className="auth-field-error">{issues[field]}</p>}
     </div>)}</>;
 }

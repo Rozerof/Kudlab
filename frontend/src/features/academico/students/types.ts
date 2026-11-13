@@ -2,7 +2,7 @@ export type Student = { id: string; groupId: string; studentCode: string; firstN
 export const studentFields = ['studentCode', 'firstName', 'lastName'] as const;
 export type StudentField = typeof studentFields[number] | 'groupId';
 export type StudentInput = Pick<Student, typeof studentFields[number]>;
-export const fieldLabels = { groupId: 'Grupo', studentCode: 'Código', firstName: 'Nombres', lastName: 'Apellidos' };
+export const fieldLabels = { groupId: 'Grupo', studentCode: 'Código', firstName: 'Seudónimo', lastName: 'Iniciales o referencia' };
 export const isUuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const object = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 export function validStudentText(value: unknown, limit: number): value is string {
