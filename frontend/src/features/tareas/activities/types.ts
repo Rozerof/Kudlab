@@ -106,10 +106,11 @@ export function parseSessionSummary(v: unknown): SessionSummary | undefined {
   return v as SessionSummary;
 }
 export function parseSession(v: unknown): SessionDetail | undefined {
-  if (!parseSessionSummary(v) || !object(v) || !isId(v.publishedVersionId) || typeof v.configurationHash !== 'string' || !/^[a-f0-9]{64}$/.test(v.configurationHash) || !validConfiguration(v.configuration) || !numeric(v.measuredDurationMs) ||
+  if (!parseSessionSummary(v) || !object(v) || !isId(v.publishedVersionId) || typeof v.configurationHash !== 'string' || !/^[a-f0-9]{64}$/.test(v.configurationHash) || (v.taskId === 'TG-01' && !validConfiguration(v.configuration)) || !numeric(v.measuredDurationMs) ||
     ![null, 'completed', 'interrupted'].includes(v.declaredState as string | null) || v.terminationReason !== null && !['time_limit', 'user_exit', 'visibility_lost', 'script_error', 'storage_failure', 'frame_gap', 'layout_changed', 'recovered_after_reload', 'evidence_limit', 'resource_error'].includes(String(v.terminationReason))) return;
-  const adaptive = v.configuration.layoutRule === 'VIEWPORT_FIT_V2';
-  if (v.gameBuildId !== (adaptive ? 'tg01-viewport-rebuild-2' : 'tg01-reference-rebuild-1') || v.device !== null && !validDevice(v.device, adaptive)) return;
+  // TG-02 a TG-04 (juegos externos): configuración y dispositivo propios del juego; no aplican las reglas de TG-01.
+  const adaptive = v.taskId === 'TG-01' && object(v.configuration) && v.configuration.layoutRule === 'VIEWPORT_FIT_V2';
+  if (v.taskId === 'TG-01' && (v.gameBuildId !== (adaptive ? 'tg01-viewport-rebuild-2' : 'tg01-reference-rebuild-1') || v.device !== null && !validDevice(v.device, adaptive))) return;
   if (v.receipt !== null && (!object(v.receipt) || !isId(v.receipt.submissionId) || !date(v.receipt.receivedAt) || typeof v.receipt.evidenceHash !== 'string' || !/^[a-f0-9]{64}$/.test(v.receipt.evidenceHash))) return;
   const c = v.calculation;
   if (object(c) && object(c.summary) && Object.keys(c.summary).length && (!count(c.summary.observed) || !count(c.summary.included) || !count(c.summary.excluded) || c.summary.observed !== c.summary.included + c.summary.excluded)) return;
