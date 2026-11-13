@@ -36,5 +36,7 @@ export const auth = betterAuth({
       return { data: candidate };
     } } },
   },
+  // DF-25001: la IP la fija app.ts (socket o proxy autenticado), nunca el navegador.
+  advanced: { ipAddress: { ipAddressHeaders: ['x-kudlab-client-ip'] } },
   plugins: [admin({ ac, roles: { admin: adminRole, teacher }, defaultRole: 'teacher' }), bearer(), jwt()],
 });

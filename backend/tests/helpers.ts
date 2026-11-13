@@ -6,7 +6,7 @@ import { capturedMail } from '../src/modules/usuarios/invitations/invitations.ma
 import { groups } from '../src/db/schema/academic.js';
 
 export async function reset() {
-  await db.execute(sql`truncate task_access_limits, students, groups, password_recovery_verifications, session_activity, account_audit_events, account_email_changes, account_invitations, admin_role_requests, user_accounts, session, account, verification, jwks, "user" restart identity cascade`);
+  await db.execute(sql`truncate login_failures, task_access_limits, students, groups, password_recovery_verifications, session_activity, account_audit_events, account_email_changes, account_invitations, admin_role_requests, user_accounts, session, account, verification, jwks, "user" restart identity cascade`);
   capturedMail.length = 0;
   await bootstrapAdmin();
 }

@@ -120,3 +120,15 @@ test('multipart remains intact; redirects, errors and absence of retries are obs
   assert.equal(fetch.mock.callCount(), before + 1);
   assert.deepEqual(await result.json(), { code: 'UNAVAILABLE', message: 'Operación no confirmada' });
 });
+
+test('DF-25001: forwards the Cloudflare client IP only with the shared secret and drops browser-supplied values', async t => {
+  const seen = [];
+  t.mock.method(globalThis, 'fetch', async request => { seen.push(request); return new Response(null, { status: 204 }); });
+  const forged = { Origin: teacher, 'CF-Connecting-IP': '203.0.113.7', 'X-Kudlab-Client-IP': '198.51.100.1', 'X-Kudlab-Proxy-Key': 'forged' };
+  await call('/api/auth/sign-in/email', { method: 'POST', body: '{}', headers: forged }, { ...env, PROXY_SHARED_SECRET: 's'.repeat(40) });
+  assert.equal(seen[0].headers.get('x-kudlab-client-ip'), '203.0.113.7');
+  assert.equal(seen[0].headers.get('x-kudlab-proxy-key'), 's'.repeat(40));
+  await call('/api/auth/sign-in/email', { method: 'POST', body: '{}', headers: forged });
+  assert.equal(seen[1].headers.get('x-kudlab-client-ip'), null);
+  assert.equal(seen[1].headers.get('x-kudlab-proxy-key'), null);
+});

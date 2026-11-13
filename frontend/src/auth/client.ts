@@ -5,7 +5,7 @@ export type Fetch = (input: string, init: RequestInit) => Promise<Response>;
 export type SessionResult =
   | { kind: 'success'; user: Identity; session: { id: string; expiresAt: string } }
   | { kind: 'absent' | 'unconfirmed' };
-export type SignInResult = { kind: 'success'; user: Identity } | { kind: 'input' | 'credentials' | 'unconfirmed' };
+export type SignInResult = { kind: 'success'; user: Identity } | { kind: 'input' | 'credentials' | 'locked' | 'unconfirmed' };
 export type SignOutResult = { kind: 'success' | 'absent' | 'unconfirmed' };
 export type AuthClient = {
   getSession(signal: AbortSignal): Promise<SessionResult>;
@@ -54,6 +54,7 @@ export function createAuthClient(origin: string, fetcher: Fetch = (url, init) =>
         const result = await request('sign-in/email', signal, { email, password, rememberMe: false });
         if (result?.status === 400 && result.data.code === 'INVALID_INPUT') return { kind: 'input' };
         if (result?.status === 401 && result.data.code === 'INVALID_CREDENTIALS') return { kind: 'credentials' };
+        if (result?.status === 429 && result.data.code === 'ACCOUNT_LOCKED') return { kind: 'locked' };
         const user = result?.status === 200 && identity(result.data.user);
         if (user) return { kind: 'success', user };
       } catch { /* Never retain submitted credentials in diagnostics. */ }

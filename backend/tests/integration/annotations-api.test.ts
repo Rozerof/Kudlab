@@ -11,7 +11,7 @@ import { createStudentAnnotation } from '../../src/modules/seguimiento/annotatio
 
 beforeEach(async () => {
   const url = new URL(process.env.DATABASE_URL!);
-  if (url.pathname !== '/kudlab_annotations_test' || !['127.0.0.1', 'localhost'].includes(url.hostname))
+  if (!/^\/kudlab_[a-z0-9_]*_test$/.test(url.pathname) || url.search || !['127.0.0.1', 'localhost', 'postgres'].includes(url.hostname))
     throw new Error('Annotations destructive tests require their exclusive local test database');
   await reset();
 });

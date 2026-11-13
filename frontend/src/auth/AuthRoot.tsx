@@ -16,6 +16,7 @@ const subscribeOnline = (notify: () => void) => { window.addEventListener('onlin
 const errorMessages = {
   input: 'Corrige los datos de acceso.',
   credentials: 'El correo o la contraseña no son correctos. Revisa los datos e inténtalo de nuevo.',
+  locked: 'Hubo demasiados intentos fallidos con este correo. Espera 15 minutos o recupera tu contraseña.',
   loginUnconfirmed: 'No pudimos confirmar el inicio de sesión',
 };
 

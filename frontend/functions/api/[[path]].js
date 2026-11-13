@@ -44,6 +44,10 @@ export async function onRequest({ request, env }) {
     if (name === 'host' || name === 'forwarded' || name.startsWith('x-forwarded-') || name === 'content-length') headers.delete(name);
   }
   headers.set('Cache-Control', 'no-store');
+  // DF-25001: la API solo acepta la IP del cliente si llega con el secreto compartido del proxy.
+  headers.delete('x-kudlab-client-ip'); headers.delete('x-kudlab-proxy-key');
+  const clientIp = request.headers.get('cf-connecting-ip');
+  if (env.PROXY_SHARED_SECRET && clientIp) { headers.set('x-kudlab-client-ip', clientIp); headers.set('x-kudlab-proxy-key', env.PROXY_SHARED_SECRET); }
   const consentUpload = request.method === 'POST' && /^\/api\/v1\/students\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/consents$/.test(incoming.pathname);
   try {
     const forwarded = new Request(new Request(target, request), {

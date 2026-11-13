@@ -40,6 +40,8 @@ const schema = z.object({
   MAIL_USER: z.string().optional(),
   MAIL_PASSWORD: z.string().optional(),
   MAIL_FROM: z.string().email().optional(),
+  // Secreto compartido con el proxy de Cloudflare Pages: solo así se acepta la IP del cliente que este reenvía.
+  PROXY_SHARED_SECRET: optionalSetting(z.string().min(32)),
   BOOTSTRAP_ADMIN_NAME: z.string().optional(),
   BOOTSTRAP_ADMIN_EMAIL: z.string().optional(),
   BOOTSTRAP_ADMIN_PASSWORD: z.string().optional(),

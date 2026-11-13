@@ -18,6 +18,15 @@ describe('auditoría y persistencia', () => {
     expect(await db.select().from(adminRoleRequests).where(eq(adminRoleRequests.requesterAccountId, account.id))).toEqual([expect.objectContaining({ status: 'RECHAZADA' })]);
     expect((await db.select().from(auditEvents).where(eq(auditEvents.targetAccountId, account.id))).length).toBeGreaterThanOrEqual(3);
   });
+  it('DF-NF10001: rechaza TRUNCATE directo y por CASCADE fuera de la base de pruebas', async () => {
+    await inviteTeacher();
+    for (const statement of [sql`truncate account_audit_events`, sql`truncate "user" cascade`])
+      await expect(db.transaction(async (tx) => {
+        await tx.execute(sql`set local kudlab.allow_truncate = 'off'`);
+        await tx.execute(statement);
+      })).rejects.toThrow();
+    expect((await db.select().from(auditEvents)).length).toBeGreaterThan(0);
+  });
   it('un rol de aplicación con SELECT/INSERT no obtiene UPDATE/DELETE de auditoría', async () => {
     await db.execute(sql`do $$ begin if not exists (select from pg_roles where rolname = 'kudlab_audit_test') then create role kudlab_audit_test; end if; end $$`);
     await db.execute(sql`grant usage on schema public to kudlab_audit_test`);

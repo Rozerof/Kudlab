@@ -133,7 +133,7 @@ export function createAuthController(client: AuthClient, timer: Clock = clock) {
         if (result?.kind === 'success') {
           // A login response alone does not prove that the browser accepted the session cookie.
           void check('signIn');
-        } else if (result?.kind === 'input' || result?.kind === 'credentials') {
+        } else if (result?.kind === 'input' || result?.kind === 'credentials' || result?.kind === 'locked') {
           publish({ kind: 'signedOut', generation, reason: 'absent', error: result.kind });
         } else void check('signIn', true);
       }, () => publish({ kind: 'checking', generation, context: 'signIn', notice: 'loginUnconfirmed' }));

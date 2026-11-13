@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { beforeEach, expect, it } from 'vitest';
 import { eq, sql } from 'drizzle-orm';
@@ -10,10 +11,10 @@ beforeEach(async () => { assertObservationTestDatabase(); await reset(); });
 it('T-01/03: el arnés rechaza otro destino o parámetros que redirijan la conexión', () => {
   const previous = process.env.DATABASE_URL;
   try {
-    for (const value of ['postgres://localhost:5432/kudlab_observaciones_test',
-      'postgres://feat-observaciones-tests-20261109:5432/kudlab_entrega',
-      'postgres://feat-observaciones-tests-20261109:5432/kudlab_observaciones_test?host=other',
-      'postgres://feat-observaciones-tests-20261109:5433/kudlab_observaciones_test']) {
+    for (const value of ['postgres://localhost:5432/kudlab_entrega',
+      'postgres://localhost:5432/kudlab_observaciones_test?host=other',
+      'postgres://localhost:5432/kudlab_observaciones_test#x',
+      'postgres://localhost:5432/otra_test']) {
       process.env.DATABASE_URL = value;
       expect(() => assertObservationTestDatabase()).toThrow('ISOLATED_OBSERVATION_TEST_DATABASE_REQUIRED');
     }
@@ -38,7 +39,9 @@ it('T-03/CA-01/04/07: esquema aditivo, originales íntegros, índices, FK y cat�
   await db.insert(revisions).values({ ...value, observationId: second!.id, requestId: randomUUID() });
   expect(await db.select().from(revisions)).toHaveLength(2);
   const applied = await db.execute(sql`select count(*)::int as n from drizzle.__drizzle_migrations`);
-  expect(applied.rows[0]!.n).toBe(15);
+  // Tantas migraciones aplicadas como entradas del journal (no un número fijo que cambia con cada migración).
+  const journal = JSON.parse(readFileSync(new URL('../../src/db/migrations/meta/_journal.json', import.meta.url), 'utf8')) as { entries: unknown[] };
+  expect(applied.rows[0]!.n).toBe(journal.entries.length);
 });
 it('T-03/CA-07: identidad y revisión se confirman o revierten juntas', async () => {
   const f = await observationFixture();

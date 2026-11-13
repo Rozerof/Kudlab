@@ -2,7 +2,7 @@ export type Identity = { id: string; email: string; name: string; role: 'ADMIN' 
 export type CheckContext = 'initial' | 'session' | 'signIn' | 'signOut' | 'denied';
 export type AccessState = { generation: number } & (
   | { kind: 'checking'; context: CheckContext; notice?: 'loginUnconfirmed' }
-  | { kind: 'signedOut'; reason: 'absent' | 'lost' | 'closed'; error?: 'input' | 'credentials' | 'loginUnconfirmed' }
+  | { kind: 'signedOut'; reason: 'absent' | 'lost' | 'closed'; error?: 'input' | 'credentials' | 'locked' | 'loginUnconfirmed' }
   | { kind: 'signingIn' }
   | { kind: 'authenticated'; user: Identity; denied: boolean }
   | { kind: 'checkUnavailable'; context: CheckContext }

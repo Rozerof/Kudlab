@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { auth } from './auth/auth.js';
 import { loadEnv } from './config/env.js';
@@ -29,6 +29,24 @@ import { createCatalogRoutes } from './modules/tareas/catalog/catalog.routes.js'
 import { groupsRoutes } from './modules/academico/groups/groups.routes.js';
 import { createGameRoutes } from './modules/tareas/runtime/routes.js';
 import type { GameDependencies } from './modules/academico/shared/participation.js';
+import { getConnInfo } from '@hono/node-server/conninfo';
+import { timingSafeEqual } from 'node:crypto';
+import { isIP } from 'node:net';
+import { clearLoginFailures, lockRemainingMs, recordLoginFailure } from './auth/login-lockout.js';
+
+// DF-25001: Better Auth limita peticiones por IP con la cabecera x-kudlab-client-ip (auth.ts). Esa cabecera
+// solo se acepta del proxy de Pages autenticado con PROXY_SHARED_SECRET; si no, se usa la IP del socket.
+export const CLIENT_IP_HEADER = 'x-kudlab-client-ip';
+function withClientIp(c: Context, secret: string | undefined): Request {
+  const headers = new Headers(c.req.raw.headers);
+  const forwarded = headers.get(CLIENT_IP_HEADER)?.trim(), key = headers.get('x-kudlab-proxy-key') ?? '';
+  headers.delete(CLIENT_IP_HEADER); headers.delete('x-kudlab-proxy-key');
+  const trusted = !!secret && key.length === secret.length && timingSafeEqual(Buffer.from(key), Buffer.from(secret));
+  let ip = trusted && forwarded && isIP(forwarded) ? forwarded : undefined;
+  if (!ip) try { ip = getConnInfo(c).remote.address; } catch { /* Las pruebas en proceso no tienen socket. */ }
+  if (ip) headers.set(CLIENT_IP_HEADER, ip);
+  return new Request(c.req.raw, { headers });
+}
 
 export function createApp(game: GameDependencies = {}, consents?: ConsentDependencies) {
 const app = new Hono<AuthVariables>();
@@ -43,6 +61,8 @@ const signInInput = z.strictObject({ email: z.email(), password: z.string().min(
 const invalidCredentials = (c: Parameters<typeof fail>[0]) => c.json({ code: 'INVALID_CREDENTIALS', message: 'Credenciales inválidas' }, 401);
 app.all('/api/auth/*', async (c) => {
   const path = c.req.path.slice('/api/auth'.length);
+  const locked = (ms: number) => { c.header('Retry-After', String(Math.ceil(ms / 1000)));
+    return c.json({ code: 'ACCOUNT_LOCKED', message: 'Demasiados intentos fallidos. Intenta de nuevo más tarde.' }, 429); };
   const allowed = (c.req.method === 'POST' && ['/sign-in/email', '/sign-out'].includes(path)) ||
     (c.req.method === 'GET' && ['/get-session', '/jwks', '/token'].includes(path));
   if (!allowed)
@@ -51,13 +71,18 @@ app.all('/api/auth/*', async (c) => {
     const parsed = signInInput.safeParse(await c.req.raw.clone().json().catch(() => null));
     if (!parsed.success) return c.json({ code: 'INVALID_INPUT', message: 'Solicitud inválida' }, 400);
     try {
-      const response = await auth.handler(c.req.raw);
-      if (!response.ok) return response.status >= 500
-        ? c.json({ code: 'UNAVAILABLE', message: 'Operación no confirmada' }, 503)
-        : invalidCredentials(c);
+      const remaining = await lockRemainingMs(parsed.data.email);
+      if (remaining > 0) return locked(remaining);
+      const response = await auth.handler(withClientIp(c, env.PROXY_SHARED_SECRET));
+      if (!response.ok) {
+        if (response.status >= 500) return c.json({ code: 'UNAVAILABLE', message: 'Operación no confirmada' }, 503);
+        if (response.status !== 429) await recordLoginFailure(parsed.data.email);
+        return invalidCredentials(c);
+      }
       const body = await response.json() as { user?: { id?: string } };
       const active = body.user?.id && await resolveActiveIdentity(body.user.id);
-      if (!active) return invalidCredentials(c);
+      if (!active) { await recordLoginFailure(parsed.data.email); return invalidCredentials(c); }
+      await clearLoginFailures(parsed.data.email);
       const headers = new Headers(response.headers);
       headers.delete('content-length');
       return new Response(JSON.stringify({ user: { id: active.identity.id, email: active.identity.email,
@@ -101,7 +126,7 @@ app.all('/api/auth/*', async (c) => {
         return c.json({ code: 'UNAUTHENTICATED', message: 'Sesión requerida' }, 401);
     } catch { return c.json({ code: 'UNAVAILABLE', message: 'Operación no confirmada' }, 503); }
   }
-  return auth.handler(c.req.raw);
+  return auth.handler(withClientIp(c, env.PROXY_SHARED_SECRET));
 });
 app.use('/api/v1/accounts/*', requireActive);
 app.use('/api/v1/accounts', requireActive);

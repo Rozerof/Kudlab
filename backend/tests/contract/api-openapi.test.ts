@@ -90,8 +90,24 @@ it('valida éxitos de todas las operaciones y errores de cada dominio contra el 
   const consentForm = new FormData();
   consentForm.append('file', new File(['fixture'], 'ficticio.png', { type: 'image/png' }));
   consentForm.append('metadata', JSON.stringify({ requestId: randomUUID(), expectedVersion: 0, signedOn: '2026-01-01', receivedOn: '2026-01-02' }));
-  expect((await consentApp.request(`${students}/${student.id}/consents`, { method: 'POST',
-    headers: { ...teacher, origin: process.env.SPA_ORIGIN! }, body: consentForm })).status).toBe(201);
+  const consents = `${students}/{id}/consents`, concreteConsents = `${students}/${student.id}/consents`;
+  const consentCall = (path: string, init: RequestInit = {}) => consentApp.request(path, { ...init, headers: { ...teacher, origin: process.env.SPA_ORIGIN!, ...(init.headers as Record<string, string> ?? {}) } });
+  await check(consents, 'GET', await consentCall(concreteConsents), 200);
+  await check(consents, 'GET', await consentCall(`${concreteConsents}?x=1`), 400);
+  const registered = await check(consents, 'POST', await consentCall(concreteConsents, { method: 'POST', body: consentForm }), 201);
+  await check(consents, 'POST', await consentCall(concreteConsents, { method: 'POST', body: '{}', headers: { 'content-type': 'application/json' } }), 415);
+  await check(`${consents}/history`, 'GET', await consentCall(`${concreteConsents}/history`), 200);
+  await check(`${consents}/operations/{requestId}`, 'GET', await consentCall(`${concreteConsents}/operations/${registered.acknowledgement.requestId}`), 200);
+  await check(`${consents}/operations/{requestId}`, 'GET', await consentCall(`${concreteConsents}/operations/${randomUUID()}`), 404);
+  await check(`${consents}/{recordId}/document`, 'GET', await consentCall(`${concreteConsents}/${registered.acknowledgement.recordId}/document`), 200);
+  const revocation = { requestId: randomUUID(), expectedVersion: 1, recordId: registered.acknowledgement.recordId, reason: 'Retiro voluntario ficticio' };
+  await check(`${consents}/revocations`, 'POST', await consentCall(`${concreteConsents}/revocations`, { method: 'POST', body: JSON.stringify({ ...revocation, expectedVersion: 0 }), headers: { 'content-type': 'application/json' } }), 409);
+  await check(`${consents}/revocations`, 'POST', await consentCall(`${concreteConsents}/revocations`, { method: 'POST', body: JSON.stringify(revocation), headers: { 'content-type': 'application/json' } }), 200);
+  // Las notas siguientes exigen consentimiento vigente: se vuelve a registrar.
+  const again = new FormData();
+  again.append('file', new File(['fixture'], 'ficticio.png', { type: 'image/png' }));
+  again.append('metadata', JSON.stringify({ requestId: randomUUID(), expectedVersion: 2, signedOn: '2026-01-03', receivedOn: '2026-01-03' }));
+  expect((await consentCall(concreteConsents, { method: 'POST', body: again })).status).toBe(201);
   const observations = `${students}/{id}/observations`, concreteObservations = `${students}/${student.id}/observations`;
   const observationBody = { requestId: randomUUID(), behavior: 'ATTENTION', frequency: 'SOMETIMES', observedOn: '2026-01-01', schoolYear: 2025, term: 1 };
   const observation = await check(observations, 'POST', await request(concreteObservations, 'POST', observationBody, teacher), 201);

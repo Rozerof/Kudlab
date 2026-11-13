@@ -4436,6 +4436,165 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '503': { $ref: '#/components/responses/Unavailable' }
+  /api/v1/students/{id}/consents:
+    parameters:
+      - $ref: '#/components/parameters/StudentId'
+    get:
+      operationId: getStudentConsent
+      summary: Consultar el estado vigente del consentimiento
+      description: >-
+        TEACHER activo responsable del curso actual del estudiante; ADMIN recibe 403 y un estudiante ajeno
+        o ausente 404 neutro. Devuelve el estado (NONE, CURRENT o REVOKED), la versión y los metadatos del
+        documento vigente, nunca el archivo. Sin consulta (cualquier parámetro causa 400).
+      tags: [ Estudiantes ]
+      security: *session
+      responses:
+        '200':
+          description: Estado vigente evaluado por el servidor.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ConsentSnapshot' } } }
+        '400': { $ref: '#/components/responses/ConsentBadInput' }
+        '401': { $ref: '#/components/responses/AcademicUnauthenticated' }
+        '403': { $ref: '#/components/responses/ConsentForbidden' }
+        '404': { $ref: '#/components/responses/ConsentNotFound' }
+        '503': { $ref: '#/components/responses/ConsentUnavailable' }
+    post:
+      operationId: registerStudentConsent
+      summary: Registrar o reemplazar el consentimiento firmado
+      description: >-
+        TEACHER activo responsable; Origin exacto del SPA. Cuerpo multipart con exactamente un `file`
+        (PDF, JPEG o PNG verificado por firma, máximo según almacenamiento) y un `metadata` JSON con
+        requestId, expectedVersion, signedOn y receivedOn (fechas reales de Bogotá, no futuras,
+        signedOn ≤ receivedOn). El documento se guarda inmutable en R2 antes de confirmar; registrar activa
+        al estudiante. Reintentar el mismo requestId con los mismos datos responde 200 con repeated=true;
+        otro contenido con el mismo requestId, 409 REQUEST_REUSED; versión desactualizada, 409 STALE_VERSION.
+        Sin almacenamiento configurado responde 503.
+      tags: [ Estudiantes ]
+      security: *session
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [ file, metadata ]
+              properties:
+                file: { type: string, contentEncoding: binary, description: 'Documento firmado: PDF, JPEG o PNG.' }
+                metadata: { type: string, description: 'JSON con requestId, expectedVersion, signedOn y receivedOn.', examples: [ '{"requestId":"00000000-0000-4000-8000-000000000020","expectedVersion":0,"signedOn":"2026-01-01","receivedOn":"2026-01-02"}' ] }
+      responses:
+        '200':
+          description: Reintento idempotente de una operación ya confirmada.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ConsentWriteResult' } } }
+        '201':
+          description: Consentimiento registrado o reemplazado.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ConsentWriteResult' } } }
+        '400': { $ref: '#/components/responses/ConsentBadInput' }
+        '401': { $ref: '#/components/responses/AcademicUnauthenticated' }
+        '403': { $ref: '#/components/responses/ConsentForbidden' }
+        '404': { $ref: '#/components/responses/ConsentNotFound' }
+        '409': { $ref: '#/components/responses/ConsentConflict' }
+        '413': { $ref: '#/components/responses/ConsentTooLarge' }
+        '415': { $ref: '#/components/responses/ConsentUnsupported' }
+        '503': { $ref: '#/components/responses/ConsentUnavailable' }
+  /api/v1/students/{id}/consents/revocations:
+    parameters:
+      - $ref: '#/components/parameters/StudentId'
+    post:
+      operationId: revokeStudentConsent
+      summary: Revocar el consentimiento vigente
+      description: >-
+        TEACHER activo responsable; Origin exacto del SPA; JSON estricto (máximo 16 KiB) con requestId,
+        expectedVersion, recordId del documento vigente y reason (1 a 2000 caracteres). El documento no se
+        borra: queda en el historial. Mismo requestId con el mismo contenido responde el acuse original;
+        recordId no vigente, 409 NOT_CURRENT.
+      tags: [ Estudiantes ]
+      security: *session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConsentRevocationInput' }
+            example: { requestId: 00000000-0000-4000-8000-000000000021, expectedVersion: 1, recordId: 00000000-0000-4000-8000-000000000022, reason: Retiro voluntario de la familia }
+      responses:
+        '200':
+          description: Revocación confirmada (o su reintento idempotente).
+          content: { application/json: { schema: { $ref: '#/components/schemas/ConsentWriteResult' } } }
+        '400': { $ref: '#/components/responses/ConsentBadInput' }
+        '401': { $ref: '#/components/responses/AcademicUnauthenticated' }
+        '403': { $ref: '#/components/responses/ConsentForbidden' }
+        '404': { $ref: '#/components/responses/ConsentNotFound' }
+        '409': { $ref: '#/components/responses/ConsentConflict' }
+        '413': { $ref: '#/components/responses/ConsentTooLarge' }
+        '415': { $ref: '#/components/responses/ConsentUnsupported' }
+        '503': { $ref: '#/components/responses/ConsentUnavailable' }
+  /api/v1/students/{id}/consents/history:
+    parameters:
+      - $ref: '#/components/parameters/StudentId'
+    get:
+      operationId: listStudentConsentHistory
+      summary: Consultar el historial de consentimiento
+      description: >-
+        Eventos REGISTER, REPLACE y REVOKE en orden de versión descendente, 25 por página. Solo admite el
+        parámetro cursor (opaco, ligado al estudiante); cualquier otro causa 400.
+      tags: [ Estudiantes ]
+      security: *session
+      parameters:
+        - { name: cursor, in: query, required: false, description: Cursor opaco de la página anterior., schema: { type: string, pattern: '^[\w-]{1,512}$' } }
+      responses:
+        '200':
+          description: Página del historial; lista vacía permitida.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ConsentHistoryPage' } } }
+        '400': { $ref: '#/components/responses/ConsentBadInput' }
+        '401': { $ref: '#/components/responses/AcademicUnauthenticated' }
+        '403': { $ref: '#/components/responses/ConsentForbidden' }
+        '404': { $ref: '#/components/responses/ConsentNotFound' }
+        '503': { $ref: '#/components/responses/ConsentUnavailable' }
+  /api/v1/students/{id}/consents/operations/{requestId}:
+    parameters:
+      - $ref: '#/components/parameters/StudentId'
+      - { name: requestId, in: path, required: true, description: requestId que el mismo docente envió para este estudiante., schema: { type: string, format: uuid } }
+    get:
+      operationId: getStudentConsentOperation
+      summary: Reconciliar una operación de consentimiento
+      description: >-
+        Permite saber, tras un corte de red, si un registro o una revocación quedó PENDING, COMMITTED o
+        REJECTED. Solo ve las operaciones del propio docente; otra cosa produce 404 neutro.
+      tags: [ Estudiantes ]
+      security: *session
+      responses:
+        '200':
+          description: Estado de la operación.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ConsentOperation' } } }
+        '400': { $ref: '#/components/responses/ConsentBadInput' }
+        '401': { $ref: '#/components/responses/AcademicUnauthenticated' }
+        '403': { $ref: '#/components/responses/ConsentForbidden' }
+        '404': { $ref: '#/components/responses/ConsentNotFound' }
+        '503': { $ref: '#/components/responses/ConsentUnavailable' }
+  /api/v1/students/{id}/consents/{recordId}/document:
+    parameters:
+      - $ref: '#/components/parameters/StudentId'
+      - { name: recordId, in: path, required: true, description: UUID de un documento del historial del estudiante., schema: { type: string, format: uuid } }
+    get:
+      operationId: downloadStudentConsentDocument
+      summary: Descargar un documento de consentimiento
+      description: >-
+        Devuelve el archivo tal como se guardó, tras verificar su SHA-256 y tamaño. Respuesta adjunta,
+        privada y sin caché. Si el almacenamiento no está disponible o el objeto no coincide, 503.
+      tags: [ Estudiantes ]
+      security: *session
+      responses:
+        '200':
+          description: Documento verificado.
+          headers:
+            Content-Disposition: { description: 'Adjunto con nombre consentimiento-<recordId>.<pdf|png|jpg>.', schema: { type: string } }
+          content:
+            application/pdf: { schema: { type: string, contentEncoding: binary } }
+            image/png: { schema: { type: string, contentEncoding: binary } }
+            image/jpeg: { schema: { type: string, contentEncoding: binary } }
+        '400': { $ref: '#/components/responses/ConsentBadInput' }
+        '401': { $ref: '#/components/responses/AcademicUnauthenticated' }
+        '403': { $ref: '#/components/responses/ConsentForbidden' }
+        '404': { $ref: '#/components/responses/ConsentNotFound' }
+        '503': { $ref: '#/components/responses/ConsentUnavailable' }
   /api/v1/students/{id}/academic-notes:
     parameters:
       - $ref: '#/components/parameters/StudentId'
@@ -5513,6 +5672,125 @@ components:
             description: Alta false; esta API no dispone de activación.,
             examples: [ false ]
           }
+    ConsentRecord:
+      type: object
+      additionalProperties: false
+      required: [ id, signedOn, receivedOn, mediaType, byteSize, sha256 ]
+      properties:
+        id: { type: string, format: uuid, description: ID del documento., examples: [ 00000000-0000-4000-8000-000000000022 ] }
+        signedOn: { type: string, format: date, description: Fecha de firma., examples: [ '2026-01-01' ] }
+        receivedOn: { type: string, format: date, description: Fecha de recepción., examples: [ '2026-01-02' ] }
+        mediaType: { type: string, enum: [ application/pdf, image/jpeg, image/png ], description: Tipo verificado por firma., examples: [ application/pdf ] }
+        byteSize: { type: integer, minimum: 1, description: Tamaño en bytes., examples: [ 120000 ] }
+        sha256: { type: string, pattern: '^[a-f0-9]{64}$', description: Resumen del archivo guardado., examples: [ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ] }
+    ConsentSnapshot:
+      type: object
+      additionalProperties: false
+      required: [ student, consent, evaluatedAt ]
+      properties:
+        student: { $ref: '#/components/schemas/Student' }
+        consent:
+          type: object
+          additionalProperties: false
+          required: [ state, version, currentRecord ]
+          properties:
+            state: { type: string, enum: [ NONE, CURRENT, REVOKED ], description: Estado vigente., examples: [ CURRENT ] }
+            version: { type: integer, minimum: 0, description: Versión para expectedVersion., examples: [ 1 ] }
+            currentRecord: { oneOf: [ { $ref: '#/components/schemas/ConsentRecord' }, { type: 'null' } ], description: Documento vigente o del último evento. }
+        evaluatedAt: { type: string, format: date-time, description: Hora del servidor., examples: [ '2026-01-02T15:00:00.000Z' ] }
+    ConsentAcknowledgement:
+      type: object
+      additionalProperties: false
+      required: [ requestId, eventId, recordId, version, confirmedAt, repeated ]
+      properties:
+        requestId: { type: string, format: uuid, description: requestId enviado., examples: [ 00000000-0000-4000-8000-000000000020 ] }
+        eventId: { type: string, format: uuid, description: Evento confirmado., examples: [ 00000000-0000-4000-8000-000000000023 ] }
+        recordId: { type: string, format: uuid, description: Documento afectado., examples: [ 00000000-0000-4000-8000-000000000022 ] }
+        version: { type: integer, minimum: 1, description: Nueva versión., examples: [ 1 ] }
+        confirmedAt: { type: string, format: date-time, description: Confirmación del servidor., examples: [ '2026-01-02T15:00:00.000Z' ] }
+        repeated: { type: boolean, description: true si es un reintento de una operación ya confirmada., examples: [ false ] }
+    ConsentWriteResult:
+      type: object
+      additionalProperties: false
+      required: [ acknowledgement, snapshot ]
+      properties:
+        acknowledgement: { $ref: '#/components/schemas/ConsentAcknowledgement' }
+        snapshot: { $ref: '#/components/schemas/ConsentSnapshot' }
+    ConsentRevocationInput:
+      type: object
+      additionalProperties: false
+      required: [ requestId, expectedVersion, recordId, reason ]
+      properties:
+        requestId: { type: string, format: uuid, description: Idempotencia por docente., examples: [ 00000000-0000-4000-8000-000000000021 ] }
+        expectedVersion: { type: integer, minimum: 0, description: Versión vigente leída., examples: [ 1 ] }
+        recordId: { type: string, format: uuid, description: Documento vigente., examples: [ 00000000-0000-4000-8000-000000000022 ] }
+        reason: { type: string, minLength: 1, maxLength: 2000, description: Motivo de la revocación., examples: [ Retiro voluntario de la familia ] }
+    ConsentHistoryPage:
+      type: object
+      additionalProperties: false
+      required: [ items, nextCursor ]
+      properties:
+        items:
+          type: array
+          maxItems: 25
+          items:
+            type: object
+            additionalProperties: false
+            required: [ id, type, version, record, previousRecordId, author, occurredAt, reason ]
+            properties:
+              id: { type: string, format: uuid, description: ID del evento., examples: [ 00000000-0000-4000-8000-000000000023 ] }
+              type: { type: string, enum: [ REGISTER, REPLACE, REVOKE ], description: Tipo de evento., examples: [ REGISTER ] }
+              version: { type: integer, minimum: 1, description: Versión del evento., examples: [ 1 ] }
+              record: { $ref: '#/components/schemas/ConsentRecord' }
+              previousRecordId: { type: [ string, 'null' ], format: uuid, description: Documento reemplazado (solo REPLACE)., examples: [ null ] }
+              author:
+                type: object
+                additionalProperties: false
+                required: [ id, name ]
+                properties:
+                  id: { type: string, format: uuid, description: Cuenta autora., examples: [ 00000000-0000-4000-8000-000000000001 ] }
+                  name: { type: string, description: Nombre al momento del evento., examples: [ Docente Ejemplo ] }
+              occurredAt: { type: string, format: date-time, description: Hora del evento., examples: [ '2026-01-02T15:00:00.000Z' ] }
+              reason: { type: [ string, 'null' ], description: Motivo (solo REVOKE)., examples: [ null ] }
+        nextCursor: { type: [ string, 'null' ], description: Cursor de la página siguiente., examples: [ null ] }
+    ConsentOperation:
+      type: object
+      additionalProperties: false
+      required: [ requestId, action, status, acknowledgement, attempt, rejectionCode ]
+      properties:
+        requestId: { type: string, format: uuid, description: requestId consultado., examples: [ 00000000-0000-4000-8000-000000000020 ] }
+        action: { type: string, enum: [ REGISTER, REVOKE ], description: Operación., examples: [ REGISTER ] }
+        status: { type: string, enum: [ PENDING, COMMITTED, REJECTED ], description: Estado de la operación., examples: [ COMMITTED ] }
+        acknowledgement: { oneOf: [ { $ref: '#/components/schemas/ConsentAcknowledgement' }, { type: 'null' } ], description: Acuse si quedó confirmada. }
+        attempt:
+          type: object
+          additionalProperties: false
+          required: [ expectedVersion, signedOn, receivedOn, mediaType, byteSize, sha256 ]
+          properties:
+            expectedVersion: { type: integer, minimum: 0, description: Versión enviada., examples: [ 0 ] }
+            signedOn: { type: [ string, 'null' ], format: date, description: Fecha de firma enviada., examples: [ '2026-01-01' ] }
+            receivedOn: { type: [ string, 'null' ], format: date, description: Fecha de recepción enviada., examples: [ '2026-01-02' ] }
+            mediaType: { type: [ string, 'null' ], description: Tipo verificado., examples: [ image/png ] }
+            byteSize: { type: [ integer, 'null' ], description: Tamaño., examples: [ 7 ] }
+            sha256: { type: [ string, 'null' ], description: Resumen., examples: [ null ] }
+        rejectionCode: { type: [ string, 'null' ], description: Motivo si fue rechazada., examples: [ null ] }
+    ConsentError:
+      type: object
+      additionalProperties: false
+      required: [ code ]
+      properties:
+        code: { type: string, enum: [ INVALID_INPUT, FORBIDDEN, NOT_FOUND, CONFLICT, UNAVAILABLE ], description: Código seguro., examples: [ CONFLICT ] }
+        message: { type: string, description: Mensaje seguro cuando lo emite la guarda de sesión o rol., examples: [ Acceso denegado ] }
+        fields:
+          type: array
+          description: Campos y motivos cuando aplica.
+          items:
+            type: object
+            additionalProperties: false
+            required: [ field, reason ]
+            properties:
+              field: { type: string, description: Campo o «operation» para conflictos., examples: [ operation ] }
+              reason: { type: string, description: Motivo (por ejemplo STALE_VERSION, REQUEST_REUSED, NOT_CURRENT, too_large)., examples: [ STALE_VERSION ] }
     UserError:
       type: object
       required: [ code, message ]
@@ -8464,6 +8742,27 @@ components:
                 }
             }
         }
+    ConsentBadInput:
+      description: 400 INVALID_INPUT; parámetros de consulta, metadatos, fechas o archivo inválidos.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ConsentError' }, example: { code: INVALID_INPUT, fields: [ { field: signedOn, reason: future_date } ] } } }
+    ConsentForbidden:
+      description: 403 FORBIDDEN; rol distinto de TEACHER u Origin distinto del SPA en escrituras.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ConsentError' }, example: { code: FORBIDDEN } } }
+    ConsentNotFound:
+      description: 404 NOT_FOUND neutro para estudiante, documento u operación ajenos o ausentes.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ConsentError' }, example: { code: NOT_FOUND } } }
+    ConsentConflict:
+      description: 409 CONFLICT con motivo STALE_VERSION, REQUEST_REUSED, NOT_CURRENT o EVIDENCE_MISMATCH.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ConsentError' }, example: { code: CONFLICT, fields: [ { field: operation, reason: STALE_VERSION } ] } } }
+    ConsentTooLarge:
+      description: 413 INVALID_INPUT; archivo o metadatos demasiado grandes.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ConsentError' }, example: { code: INVALID_INPUT, fields: [ { field: file, reason: too_large } ] } } }
+    ConsentUnsupported:
+      description: 415 INVALID_INPUT; Content-Type distinto del esperado.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ConsentError' }, example: { code: INVALID_INPUT } } }
+    ConsentUnavailable:
+      description: 503 UNAVAILABLE; almacenamiento o base no disponible, sin confirmar la operación (reconciliar con operations/{requestId}).
+      content: { application/json: { schema: { $ref: '#/components/schemas/ConsentError' }, example: { code: UNAVAILABLE } } }
     AcademicUnauthenticated:
       description: 401 UNAUTHENTICATED; sesión no utilizable.
       content:
