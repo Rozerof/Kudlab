@@ -1,0 +1,111 @@
+import { z } from 'zod';
+import { isIP } from 'node:net';
+
+const controls = /[\u0000-\u001f\u007f]/;
+const optionalSetting = <T extends z.ZodType>(value: T) => z.preprocess(input => input === '' ? undefined : input, value.optional());
+const publicUrl = z.string().url().refine((value) => !controls.test(value) && value === value.trim());
+
+const url = z.string().url().refine((value) => {
+  try {
+    const parsed = new URL(value);
+    return !controls.test(value) && value === value.trim() &&
+      (parsed.protocol === 'https:' || (parsed.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(parsed.hostname))) &&
+      !parsed.username && !parsed.password && !parsed.search && !parsed.hash && parsed.pathname === '/';
+  } catch { return false; }
+}, 'Debe ser un origen HTTPS (o localhost HTTP) sin ruta ni credenciales');
+
+const schema = z.object({
+  NODE_ENV: z.string().optional(),
+  KUDLAB_LOCAL_SYNTHETIC_ENABLED: z.enum(['true', 'false']).optional().transform(v => v === 'true'),
+  KUDLAB_LOCAL_SYNTHETIC_DATA_CONFIRMED: z.enum(['true', 'false']).optional().transform(v => v === 'true'),
+  DATABASE_URL: z.string().url().startsWith('postgres'),
+  BETTER_AUTH_SECRET: z.string().min(32),
+  BETTER_AUTH_URL: url,
+  SPA_ORIGIN: url,
+  GAME_RUNTIME_ORIGIN: optionalSetting(url),
+  GAME_GRANT_KEYS: optionalSetting(z.string()),
+  GAME_ACTIVE_KEY_ID: optionalSetting(z.string().regex(/^[a-zA-Z0-9_-]{1,32}$/)),
+  GAME_CURSOR_KEY: optionalSetting(z.string().regex(/^[a-f0-9]{64}$/)),
+  GAME_ACCESS_ENABLED: z.enum(['true', 'false']).optional().transform(v => v === 'true'),
+  GAME_ACCESS_LOOKUP_KEY: optionalSetting(z.string().regex(/^[a-f0-9]{64}$/)),
+  GAME_ACCESS_IP_KEY: optionalSetting(z.string().regex(/^[a-f0-9]{64}$/)),
+  GAME_ACCESS_KEYS: optionalSetting(z.string()),
+  GAME_ACCESS_ACTIVE_KEY_ID: optionalSetting(z.string().regex(/^[a-zA-Z0-9_-]{1,32}$/)),
+  INVITATION_BASE_URL: publicUrl,
+  EMAIL_CHANGE_BASE_URL: publicUrl,
+  RESET_BASE_URL: publicUrl,
+  MAIL_MODE: z.enum(['smtp', 'capture']).default('smtp'),
+  MAIL_HOST: z.string().optional(),
+  MAIL_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+  MAIL_USER: z.string().optional(),
+  MAIL_PASSWORD: z.string().optional(),
+  MAIL_FROM: z.string().email().optional(),
+  BOOTSTRAP_ADMIN_NAME: z.string().optional(),
+  BOOTSTRAP_ADMIN_EMAIL: z.string().optional(),
+  BOOTSTRAP_ADMIN_PASSWORD: z.string().optional(),
+}).superRefine((config, ctx) => {
+  const issue = (key: string) => ctx.addIssue({ code: 'custom', path: [key], message: 'Configuración inválida' });
+  if (config.KUDLAB_LOCAL_SYNTHETIC_ENABLED) {
+    if (config.NODE_ENV !== 'development') issue('NODE_ENV');
+    if (!config.KUDLAB_LOCAL_SYNTHETIC_DATA_CONFIRMED) issue('KUDLAB_LOCAL_SYNTHETIC_DATA_CONFIRMED');
+    try {
+      const database = new URL(config.DATABASE_URL);
+      if (!['postgres:', 'postgresql:'].includes(database.protocol) || database.pathname !== '/kudlab_local' ||
+        !['postgres', 'localhost', '127.0.0.1'].includes(database.hostname) || database.search || database.hash) issue('DATABASE_URL');
+    } catch { issue('DATABASE_URL'); }
+    for (const key of ['BETTER_AUTH_URL', 'SPA_ORIGIN', 'GAME_RUNTIME_ORIGIN'] as const) {
+      try { if (!['localhost', '127.0.0.1'].includes(new URL(config[key] ?? '').hostname)) issue(key); }
+      catch { issue(key); }
+    }
+  }
+  if (config.GAME_ACCESS_ENABLED) {
+    if (!config.GAME_RUNTIME_ORIGIN || !config.GAME_ACCESS_LOOKUP_KEY || !config.GAME_ACCESS_IP_KEY || config.GAME_ACCESS_LOOKUP_KEY === config.GAME_ACCESS_IP_KEY) issue('GAME_ACCESS_LOOKUP_KEY');
+    try {
+      const keys = JSON.parse(config.GAME_ACCESS_KEYS ?? '{}');
+      if (!keys || Array.isArray(keys) || !Object.hasOwn(keys, config.GAME_ACCESS_ACTIVE_KEY_ID ?? '') || Object.entries(keys).some(([id, key]) => !/^[a-zA-Z0-9_-]{1,32}$/.test(id) || typeof key !== 'string' || !/^[a-f0-9]{64}$/.test(key))) issue('GAME_ACCESS_KEYS');
+      const reserved = [config.GAME_CURSOR_KEY, ...Object.values(JSON.parse(config.GAME_GRANT_KEYS ?? '{}'))];
+      if (reserved.includes(config.GAME_ACCESS_LOOKUP_KEY) || reserved.includes(config.GAME_ACCESS_IP_KEY)) issue('GAME_ACCESS_LOOKUP_KEY');
+      if (keys && Object.values(keys).some(key => [...reserved, config.GAME_ACCESS_LOOKUP_KEY, config.GAME_ACCESS_IP_KEY].includes(key))) issue('GAME_ACCESS_KEYS');
+    } catch { issue('GAME_ACCESS_KEYS'); }
+  }
+  if (config.GAME_RUNTIME_ORIGIN) {
+    try { if (new URL(config.GAME_RUNTIME_ORIGIN).origin !== config.GAME_RUNTIME_ORIGIN || new URL(config.GAME_RUNTIME_ORIGIN).origin === new URL(config.SPA_ORIGIN).origin) issue('GAME_RUNTIME_ORIGIN'); }
+    catch { issue('GAME_RUNTIME_ORIGIN'); }
+    if (!config.GAME_ACTIVE_KEY_ID || !config.GAME_CURSOR_KEY) issue('GAME_ACTIVE_KEY_ID');
+    try {
+      const keys = JSON.parse(config.GAME_GRANT_KEYS ?? '{}') as Record<string, unknown>;
+      if (!keys || Array.isArray(keys) || typeof keys !== 'object' || !Object.hasOwn(keys, config.GAME_ACTIVE_KEY_ID ?? '') ||
+        Object.entries(keys).some(([id, key]) => !/^[a-zA-Z0-9_-]{1,32}$/.test(id) || typeof key !== 'string' || !/^[a-f0-9]{64}$/.test(key))) issue('GAME_GRANT_KEYS');
+    } catch { issue('GAME_GRANT_KEYS'); }
+  } else if (config.GAME_GRANT_KEYS || config.GAME_ACTIVE_KEY_ID || config.GAME_CURSOR_KEY) issue('GAME_RUNTIME_ORIGIN');
+  if (config.MAIL_MODE === 'capture' && config.NODE_ENV !== 'test') issue('MAIL_MODE');
+  if (config.MAIL_MODE === 'smtp') {
+    for (const key of ['MAIL_HOST', 'MAIL_USER', 'MAIL_PASSWORD', 'MAIL_FROM'] as const)
+      if (!config[key]?.trim()) issue(key);
+    const host = config.MAIL_HOST;
+    if (host && (isIP(host) || host.length > 253 || !host.split('.').every((label) => /^[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?$/i.test(label)))) issue('MAIL_HOST');
+    if (config.MAIL_USER && controls.test(config.MAIL_USER)) issue('MAIL_USER');
+  }
+  if (config.MAIL_FROM && controls.test(config.MAIL_FROM)) issue('MAIL_FROM');
+  let spaOrigin: string;
+  try { spaOrigin = new URL(config.SPA_ORIGIN).origin; } catch { return; } // The field schema already reports SPA_ORIGIN.
+  for (const key of ['INVITATION_BASE_URL', 'EMAIL_CHANGE_BASE_URL', 'RESET_BASE_URL'] as const) {
+    let target: URL;
+    try { target = new URL(config[key]); } catch { issue(key); continue; }
+    if (target.origin !== spaOrigin || target.username || target.password || target.search || target.hash ||
+      !(target.protocol === 'https:' || (target.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(target.hostname)))) issue(key);
+  }
+  if (config.INVITATION_BASE_URL === config.EMAIL_CHANGE_BASE_URL) issue('EMAIL_CHANGE_BASE_URL');
+});
+
+export class ConfigurationError extends Error {
+  constructor(fields: string[]) { super(`Configuración inválida: ${fields.join(', ')}. Revise los ajustes indicados.`); }
+}
+
+export function loadEnv(source: NodeJS.ProcessEnv = process.env) {
+  const result = schema.safeParse(source);
+  if (!result.success) throw new ConfigurationError([...new Set(result.error.issues.map((issue) => String(issue.path[0] ?? 'entorno')))]);
+  return result.data;
+}
+
+export const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;

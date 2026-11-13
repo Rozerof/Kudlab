@@ -1,0 +1,190 @@
+# Kudlab Backend
+
+## Docker local
+
+Este checkout incluye `Dockerfile` para Node 24 sin usuario root y `.dockerignore`.
+La composición de los tres proyectos se arranca desde Kudlab Frontend con
+`npm run docker:setup -- /ruta/a/este/backend /ruta/a/Play` y `npm run docker:up`.
+El backend espera PostgreSQL, aplica migraciones y ejecuta el bootstrap normal;
+por defecto no inyecta participación sintética ni habilita partidas. PostgreSQL y secretos
+deben ser propios del entorno local, nunca una base compartida/de producción.
+Consultar `docs/docker-local.md` del frontend para correo pendiente, persistencia,
+puertos, configuración y evidencia. Este cambio no añade rutas ni cambia reglas API.
+
+### Demostración TG-01 exclusivamente sintética
+
+Opt-in privado: `KUDLAB_LOCAL_SYNTHETIC_ENABLED=true` y
+`KUDLAB_LOCAL_SYNTHETIC_DATA_CONFIRMED=true` (declaración del operador).
+Solo se admite `NODE_ENV=development`, BD `kudlab_local` en `postgres` (servicio
+Compose), `localhost` o `127.0.0.1`, sin parámetros de conexión alternativos, y
+orígenes API/docente/Play loopback. Estas comprobaciones no prueban el contenido
+de la base: comprobar aislamiento y datos ficticios antes de habilitar.
+
+El arranque comparte política sintética entre API y procesador. Las altas nuevas
+quedan activas; la baja bloquea nuevas operaciones y persiste al reiniciar.
+Los estudiantes históricos no se actualizan. No hay consentimiento real ni
+aprobación metodológica: la regla permanece PROPOSED y los permisos no cambian.
+
+Con entorno comprobado y autorización del operador, `npm run game:prepare-local`
+publica/reutiliza la configuración compatible y habilita TG-01 en una transacción.
+Repetirlo no duplica versiones ni cambia revisión sin un cambio efectivo; un
+conflicto revierte la preparación. No se ejecuta al arrancar ni reactiva tareas
+o estudiantes tras reinicios. El comando no aplica migraciones.
+
+Para códigos se necesita `GAME_ACCESS_ENABLED=true` y las claves independientes
+`GAME_ACCESS_LOOKUP_KEY`, `GAME_ACCESS_IP_KEY`, `GAME_ACCESS_KEYS` y su
+`GAME_ACCESS_ACTIVE_KEY_ID`. El setup frontend puede agregar faltantes con
+confirmación; no poner estas claves en `VITE_*`. Desactivar el modo sintético
+restaura la política normal sin borrar asignaciones, sesiones ni evidencia.
+Preparación, migraciones del CMD y operación de Docker requieren autorización
+separada; una build o pruebas unitarias no acreditan el recorrido integrado.
+
+**J-03:** códigos individuales de **5 caracteres alfanuméricos**, gestión docente,
+canje público y recuperación sobre el mismo runtime. Migración aditiva 0012 y
+límites compartidos en PostgreSQL. OpenAPI: **58 operaciones/12 tags**; artefacto
+canónico 1.2.0, sin cambiar sobres 1.0/1.1 ni fórmulas. Uso real sigue bloqueado.
+[Operación y preparación](docs/acceso-codigo.md) · [Verificación y límites](docs/acceso-codigo-verificacion.md).
+[Refinamiento de aula y acuse automático](docs/aula-acuse.md) · [Verificación del refinamiento](docs/aula-acuse-verificacion.md).
+Las cifras/exclusiones de J-02 siguientes conservan el estado de su entrega anterior.
+
+**J-02 (2026-10-27):** asignación supervisada de TG-01, capacidades runtime 1.0/1.1,
+ingesta idempotente, procesamiento recuperable y consulta individual. OpenAPI:
+50 operaciones/11 tags. **Entrega técnica con datos ficticios y BD aislada**;
+la composición normal no concede consentimiento/participación. Sin J-03.
+[Integración, ejecución y límites](docs/integracion-play.md).
+
+**Cursos:** CRUD ADMIN de cursos y asignación de profesor, consulta propia TEACHER y listado de estudiantes por curso. Transferencia confirmada conserva registros y cambia el acceso actual; solo se eliminan cursos sin estudiantes, incluidos inactivos. ADMIN no recibe acceso a registros estudiantiles. El contrato actual está en [OpenAPI](docs/api/openapi.yaml).
+
+API del prototipo piloto Kudlab, una herramienta de apoyo al seguimiento pedagógico de estudiantes de tercero del Colegio San Diego (Duitama). El proyecto busca reunir observaciones docentes, notas escolares y resultados de tareas digitales para consultar la evolución de cada estudiante. No sustituye una evaluación curricular ni produce diagnósticos clínicos.
+
+El diseño distingue Usuarios, Académico, Tareas, Evolución y Seguimiento. **Los profesores operan los registros estudiantiles; los estudiantes no tienen cuentas docentes.** La disponibilidad HTTP se consulta en el [OpenAPI actual](docs/api/openapi.yaml), no se infiere del diseño histórico de módulos.
+
+## Tecnologías y requisitos
+
+**Ampliación vertical 01:** esta rama incorpora consulta persistida de catálogo y
+ficha de Tareas para ADMIN/TEACHER activos, sin ejecutar ni asignar juegos.
+TG-01 se registra deshabilitada, sin integración comprobada ni versión publicada.
+El catálogo OpenAPI pasa a **28 operaciones**; las menciones históricas de Tareas
+fuera de HTTP/26 operaciones describen la base anterior. Consultar el
+[contrato actual](docs/api/openapi.yaml) y la [integración Play](docs/integracion-play.md).
+
+- Node.js 24 y npm (el proyecto exige `>=24 <25`).
+- PostgreSQL accesible desde la máquina donde se ejecuta la API.
+- Servidor SMTP y una cuenta remitente para invitaciones y cambios de correo. El modo de captura de mensajes está reservado a pruebas (`NODE_ENV=test`).
+
+La implementación utiliza TypeScript, Hono, Better Auth y Drizzle ORM sobre PostgreSQL. Este repositorio contiene la API; no incluye la aplicación web.
+
+## Ejecución local
+
+1. Instala las dependencias y crea un archivo de configuración local:
+
+   ```bash
+   SCARF_ANALYTICS=false npm ci
+   cp .env.example .env
+   ```
+
+2. Crea una base PostgreSQL y completa `.env` con valores propios. Como mínimo:
+
+   - `DATABASE_URL`: URL de conexión PostgreSQL de la aplicación. Para migraciones puede utilizarse `MIGRATION_DATABASE_URL` si el usuario que administra el esquema es distinto.
+   - `BETTER_AUTH_SECRET`: secreto de al menos 32 caracteres; `BETTER_AUTH_URL`: origen público de esta API, por ejemplo `http://localhost:3000`.
+    - `SPA_ORIGIN`: origen de la aplicación web autorizada, por ejemplo `http://localhost:5173`; `INVITATION_BASE_URL`: `<SPA_ORIGIN>/acceso/invitacion`, pantalla pública para establecer contraseña y activar la cuenta. No dirigir invitaciones al login ni a `/accept`. Tras el canje, el profesor inicia sesión por separado.
+    - `EMAIL_CHANGE_BASE_URL`: URL de la pantalla de confirmación de cambio de correo, distinta de la de invitación; `RESET_BASE_URL`: pantalla de recuperación de contraseña. Las tres URLs deben pertenecer a `SPA_ORIGIN`, sin credenciales, parámetros ni fragmentos; HTTPS salvo loopback HTTP local. El cliente debe dirigir cada pantalla a su operación correspondiente; este repositorio no implementa esas pantallas.
+   - `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASSWORD` y `MAIL_FROM`: datos del servidor SMTP. Fuera de las pruebas, el envío de correos necesita estos valores.
+   - `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_EMAIL` y `BOOTSTRAP_ADMIN_PASSWORD`: datos del primer administrador. El correo debe terminar en `.edu.co` y la contraseña debe tener entre 8 y 128 caracteres, con mayúscula, minúscula y número. El administrador se crea al arrancar **solo si aún no hay cuentas**.
+
+   `BETTER_AUTH_URL` y `SPA_ORIGIN` deben ser orígenes HTTPS, salvo `localhost` o `127.0.0.1` por HTTP. No subas `.env` ni credenciales al repositorio.
+
+3. Aplica las migraciones y arranca la API:
+
+   ```bash
+   npm run db:migrate
+    NODE_ENV=development npm run dev
+   ```
+
+   La API escucha en el puerto `3000` por defecto; se puede cambiar con `PORT`. Para ejecutarla sin vigilancia de archivos, usa `npm start`.
+
+## Verificación
+
+### Registro y almacenamiento privado de consentimiento
+
+`src/modules/academico/consents/consent-storage.ts` contiene el adaptador R2;
+conectado al registro y descarga docentes mediante `consents.service.ts`. Lee las cuatro
+variables `CONSENT_STORAGE_*` de `.env.example` desde el entorno privado Backend.
+Solo admite el endpoint S3 HTTPS **Default** de R2 y claves explícitas; configuración
+ausente/inválida deja sus operaciones indisponibles sin impedir crear el adaptador.
+
+El servicio autoriza al docente y comprueba archivo no vacío, máximo **10 MiB**,
+cabecera básica PDF/JPEG/PNG y extensión coherente antes de reservar/subir. No confía
+en el MIME declarado. No necesita worker, socket, qpdf/Poppler ni decodificación de
+imágenes. El profesor revisa contenido, firma y legibilidad: el sistema no garantiza
+estructura completa ni rechaza automáticamente contraseña, animación, páginas o
+dimensiones. La evidencia se descarga como adjunto privado, sin vista previa.
+
+`describeConsentEvidence` liga un UUID v4 generado por servidor a
+bytes/tamaño/SHA-256; **no valida PDF/JPEG/PNG**. `putImmutable` usa `If-None-Match: *`
+y confirma los bytes mediante GET, también ante 412 o respuesta de subida incierta.
+No sobrescribe ni borra; un GET 404 tras un PUT incierto sigue siendo indisponibilidad,
+no prueba de rechazo definitivo. El reintento explícito conserva referencia y bytes.
+
+`readVerified` comprueba metadatos, tamaño real y SHA-256 antes de devolver el buffer,
+con máximo de 10 MiB. Cada operación tiene 30 s totales, admite cancelación y cierra
+el stream; el SDK no reintenta automáticamente. Los errores expuestos por este
+adaptador son `UNAVAILABLE` o `EVIDENCE_MISMATCH`, sin diagnóstico crudo del proveedor.
+La descarga reautoriza después del GET y trata integridad no comprobable
+como indisponibilidad, conservando el consentimiento. `close()` libera el cliente SDK.
+La activación ocurre junto al registro confirmado en el commit, después de verificar
+el objeto guardado; seleccionar un archivo o iniciar su envío no activa al estudiante.
+
+Prueba local sin PostgreSQL, credenciales reales ni peticiones externas:
+`npm test -- tests/unit/consent-storage.test.ts`. Usa serialización/firma del SDK y
+transporte simulado; no acredita R2 real, validación estructural ni aceptación funcional.
+
+### Correo con Gmail
+
+1. Elige una cuenta remitente de Gmail o Workspace con permiso para enviar. En tu cuenta de Google, habilita la verificación en dos pasos y crea una contraseña de aplicación **si la cuenta lo permite**. Si la opción está bloqueada, consulta al administrador antes de cambiar mecanismo; esta integración no implementa OAuth.
+2. Configura en el `.env` local ignorado o gestor de secretos `MAIL_MODE=smtp`, `MAIL_HOST=smtp.gmail.com`, `MAIL_PORT=465`, `MAIL_USER` y `MAIL_FROM` con la dirección completa elegida, y `MAIL_PASSWORD` con la contraseña de aplicación. No uses la contraseña habitual ni compartas secretos en el chat. El puerto 587 también funciona con STARTTLS obligatorio. No hay opción de TLS inseguro; el nombre DNS debe coincidir con el certificado.
+3. Completa las tres URLs SPA descritas arriba. Para actualizar un despliegue anterior, agrega `EMAIL_CHANGE_BASE_URL` antes de reiniciar: configuración incompleta impide el arranque con un aviso que identifica el ajuste, no su valor. Una caída del proveedor no bloquea el arranque, aunque sí puede impedir los envíos.
+4. Para el primer envío real, usar buzones controlados y autorización explícita; registrar aceptación SMTP y recepción por separado, sin guardar direcciones, cuerpos ni tokens en evidencias. La cuenta remitente puede ser Gmail personal; las cuentas destinatarias del piloto conservan la política institucional `.edu.co`. No se modifica esa política para facilitar las pruebas. Las pruebas SMTP automatizadas usan las fixtures sintéticas del repositorio.
+
+El sistema envía texto en español para invitación, cambio de correo y recuperación. `ENVIADA` significa **aceptada por el servidor SMTP**, no llegada a bandeja de entrada ni lectura. `PENDIENTE` también puede representar un resultado incierto. Un `503 DELIVERY_STATUS_UNKNOWN` no autoriza un reintento automático: consulta la cuenta existente antes de repetir un alta; no se duplican cuentas ni se activan por enviar un correo. Recuperación mantiene su respuesta pública neutra, pero no promete ocultar diferencias de tiempo.
+
+El envío sigue siendo síncrono: los timeouts de DNS, conexión y saludo son 30 segundos cada uno; el de inactividad de socket es 600 segundos para permitir la confirmación final del proveedor. No constituyen un límite total de respuesta HTTP. Configura el despliegue teniendo en cuenta esa espera y evita reintentos ciegos en cliente/proxy. No hay colas, reenvíos automáticos, seguimiento de rebotes ni endpoint público de correo de prueba.
+
+Los diagnósticos JSON `mail_attempt` incluyen referencia interna, propósito, fecha, resultado y categoría fija; nunca cuerpo, dirección ni enlace/token. El operador debe restringir el acceso a stdout/stderr y a su recolector; no se exponen por la API ni se cambia la política existente de retención. No habilites debug ni logs de transacciones SMTP. Captura solo se acepta con `NODE_ENV=test` y datos ficticios; en ese modo no se contacta al proveedor.
+
+### Pruebas automatizadas
+
+```bash
+npm run typecheck
+npm test
+```
+
+Las pruebas de integración necesitan una base PostgreSQL **aislada y migrada**: las fixtures truncan tablas con `CASCADE`. No usar una base compartida, escolar o productiva. Define explícitamente `DATABASE_URL` y, si existe, `MIGRATION_DATABASE_URL` hacia la misma base desechable antes de migrar o probar; no dependas del fallback de `tests/setup.ts` ni reutilices la BD de otro worktree. Usa únicamente datos ficticios. La validación documental no necesita PostgreSQL:
+
+```bash
+npm run docs:check
+```
+
+## API y documentación
+
+El catálogo canónico es [`docs/api/openapi.yaml`](docs/api/openapi.yaml), OpenAPI 3.1.0: **59 operaciones**. Incluye parámetros, cuerpos, respuestas, errores, permisos y ejemplos sintéticos/no operativos. Los contratos históricos consumidos por regresión permanecen en [`tests/fixtures/openapi/`](tests/fixtures/openapi/README.md); no son una segunda fuente operativa.
+
+Con `NODE_ENV=development` o `NODE_ENV=test` explícitos:
+
+- Swagger UI de consulta: `http://localhost:3000/docs`.
+- Contrato descargable: `http://localhost:3000/openapi.yaml`.
+- CSS y bundle se sirven localmente, sin CDN ni validación remota. `SCARF_ANALYTICS=false` desactiva la analítica de instalación del paquete Swagger UI.
+
+En producción, staging, entorno vacío o ausente, **UI, contrato y assets devuelven 404**, incluso con sesión ADMIN. El script `dev` no configura el entorno por sí mismo: usa `NODE_ENV=development npm run dev` para habilitar documentación local. No exponerla mediante un default permisivo.
+
+La UI no ejecuta peticiones de negocio (“Try it out” deshabilitado), no contiene credenciales precargadas ni persiste autorización. El cliente real utiliza cookie HttpOnly o Bearer **opaco de sesión persistida**, no el JWT de interoperabilidad de `/api/auth/token`. El navegador no permite fijar libremente `Cookie` ni leer cookies HttpOnly; no cambies CORS o permisos para sortearlo. Los tokens de invitación, correo o recuperación son de un uso y no son sesiones. ADMIN no tiene acceso implícito a operaciones de estudiantes.
+
+### Actualizar y verificar
+
+1. Contrastar cambios con `src/app.ts`, lista blanca de autenticación, routers, validadores, servicios y pruebas: documentar únicamente lo implementado.
+2. Actualizar el YAML canónico y, solo cuando cambie el alcance autorizado, revisar la lista independiente `tests/fixtures/openapi/operations.json`. No generar las expectativas automáticamente desde el mismo YAML bajo prueba. Reiniciar el proceso tras cambiar el YAML: se carga una vez al construir el router, no en cada petición.
+3. Ejecutar `npm run docs:check`: valida estructura OpenAPI completa, referencias internas, IDs, ejemplos/esquemas y publicación por entorno; no importa app/bootstrap ni necesita BD. También comprueba mutaciones negativas del contrato.
+4. Ejecutar `npm run typecheck` y contratos/regresión con BD exclusiva. Las respuestas reales deben validar contra el documento; no cambies el negocio para ajustarlo a un supuesto documental.
+5. Abrir `/docs` y expandir una operación por tag; comprobar esquemas, seguridad y ejemplos, consola sin errores, solo tres peticiones locales de recursos y cero solicitudes de negocio/exteriores. Separar ese resultado de la validación documental y HTTP.
+
+Las verificaciones de tipos, documentación y regresión descritas arriba se ejecutan desde un checkout limpio con `npm ci`. La planificación y configuración personal de agentes no son requisitos de ejecución ni se distribuyen con el repositorio.
