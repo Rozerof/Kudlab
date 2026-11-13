@@ -342,13 +342,22 @@
 .column-help { display: inline-flex; align-items: center; justify-content: center; min-width: 2rem; min-height: 2rem; border: 1px solid transparent; border-radius: .5rem; color: var(--foreground); cursor: help; }
 .column-help:hover, .column-help[data-popup-open] { border-color: var(--foreground); }
 
-/* Página de acceso con fotografías (solo en pantallas anchas). */
+/* Página de acceso: fotografía de fondo que se difumina hacia el contenido. */
+.auth-hero-page { position: relative; isolation: isolate; overflow: hidden; }
+.auth-backdrop { position: absolute; inset: 0 0 auto auto; z-index: -1; width: 100%; height: 22rem; background-size: cover; background-position: center 30%;
+  -webkit-mask-image: linear-gradient(to bottom, rgb(0 0 0 / .55), transparent); mask-image: linear-gradient(to bottom, rgb(0 0 0 / .55), transparent); }
+.auth-hero-page .auth-header { border-bottom-color: transparent; background: rgb(255 255 255 / .7); backdrop-filter: blur(6px); }
 .auth-split { display: grid; flex: 1; grid-template-columns: minmax(0, 1fr); }
-.auth-gallery { display: none; }
+.auth-hero { display: none; }
+.auth-hero-page .auth-main > * { box-shadow: 0 24px 60px -24px rgb(15 23 42 / .35); }
 @media (min-width: 64rem) {
-  .auth-split { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: center; max-width: 75rem; width: 100%; margin-inline: auto; padding-inline: 2rem; gap: 2rem; }
-  .auth-gallery { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; padding-block: 2rem; }
-  .auth-photo { width: 100%; height: 11rem; object-fit: cover; border-radius: 1rem; }
-  .auth-photo-main { grid-column: 1 / -1; height: 18rem; }
-  .auth-gallery-caption { grid-column: 1 / -1; font-size: .95rem; line-height: 1.5; color: var(--muted-foreground, inherit); }
+  .auth-backdrop { width: 62%; height: 100%;
+    -webkit-mask-image: linear-gradient(to left, #000 35%, rgb(0 0 0 / .35) 70%, transparent);
+    mask-image: linear-gradient(to left, #000 35%, rgb(0 0 0 / .35) 70%, transparent); }
+  .auth-split { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: center; gap: 3rem; max-width: 75rem; width: 100%; margin-inline: auto; padding-inline: 2rem; }
+  .auth-hero { display: grid; gap: 1.25rem; padding-block: 3rem; }
+  .auth-hero-kicker { font-size: .8rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+  .auth-hero-title { font-size: clamp(2.5rem, 4.5vw, 3.75rem); font-weight: 750; line-height: 1.05; letter-spacing: -.03em; }
+  .auth-hero-title span { color: #ea7a2a; }
+  .auth-hero-text { max-width: 32rem; font-size: 1.125rem; line-height: 1.6; }
 }

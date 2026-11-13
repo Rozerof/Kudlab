@@ -1,28 +1,25 @@
 import type { ReactNode } from 'react';
-import lectura from '@/assets/fotos/lectura.webp';
-import ventana from '@/assets/fotos/ventana.webp';
-import juego from '@/assets/fotos/juego.webp';
+import fondo from '@/assets/fotos/lectura.webp';
 
-// Fotografías de Pexels (licencia libre): thirdman 8926541 y 8926548, Gustavo Fring 5621973.
-function AuthGallery() {
-  return <aside className="auth-gallery" aria-hidden="true">
-    <img className="auth-photo auth-photo-main" src={lectura} alt="" loading="eager" />
-    <img className="auth-photo" src={ventana} alt="" loading="lazy" />
-    <img className="auth-photo" src={juego} alt="" loading="lazy" />
-    <p className="auth-gallery-caption">Aprender jugando: apoyo al seguimiento de la atención y la memoria en el aula.</p>
-  </aside>;
-}
-
+// Fotografía de fondo: Gustavo Fring, Pexels 5621973 (licencia libre de Pexels).
 export function StaffLayout({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
-  return <div className={wide ? 'auth-page workspace-page' : 'auth-page'}>
-    {!wide && <header className="auth-header">
+  if (wide) return <div className="auth-page workspace-page"><main id="contenido" className="staff-main">{children}</main></div>;
+  return <div className="auth-page auth-hero-page">
+    <div className="auth-backdrop" aria-hidden="true" style={{ backgroundImage: `url(${fondo})` }} />
+    <header className="auth-header">
       <div className="auth-header-inner">
         <p className="auth-brand">Kudlab</p>
         <p className="auth-caption">Acceso del profesorado</p>
       </div>
-    </header>}
-    {wide ? <main id="contenido" className="staff-main">{children}</main>
-      : <div className="auth-split"><AuthGallery /><main id="contenido" className="auth-main">{children}</main></div>}
-    {!wide && <footer className="auth-footer">Kudlab · Apoyo al seguimiento pedagógico</footer>}
+    </header>
+    <div className="auth-split">
+      <section className="auth-hero" aria-label="Presentación">
+        <p className="auth-hero-kicker">Para docentes de primaria</p>
+        <h2 className="auth-hero-title">Aprender jugando.<br /><span>Acompañar mejor.</span></h2>
+        <p className="auth-hero-text">Actividades digitales, observación docente e indicadores de atención y memoria conectados en un solo lugar. Apoyo pedagógico, no diagnóstico.</p>
+      </section>
+      <main id="contenido" className="auth-main">{children}</main>
+    </div>
+    <footer className="auth-footer">Kudlab · Apoyo al seguimiento pedagógico</footer>
   </div>;
 }
