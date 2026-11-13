@@ -12,8 +12,8 @@ export const userAccounts = pgTable('user_accounts', {
   check('account_role_check', sql`${t.role} in ('ADMIN','TEACHER')`),
   check('account_status_check', sql`${t.status} in ('PENDIENTE','ACTIVA','INACTIVA')`),
   check('account_auth_check', sql`(${t.status} = 'PENDIENTE' and ${t.authUserId} is null) or (${t.status} <> 'PENDIENTE' and ${t.authUserId} is not null)`),
-  check('account_email_check', sql`${t.emailNormalized} = lower(${t.emailNormalized}) and ${t.emailNormalized} ~ '^[^@[:space:]]+@([a-z0-9-]+\\.)+edu\\.co$'`),
-  check('pending_email_check', sql`${t.pendingEmailNormalized} is null or (${t.pendingEmailNormalized} = lower(${t.pendingEmailNormalized}) and ${t.pendingEmailNormalized} ~ '^[^@[:space:]]+@([a-z0-9-]+\\.)+edu\\.co$')`),
+  check('account_email_check', sql`${t.emailNormalized} = lower(${t.emailNormalized}) and ${t.emailNormalized} ~ '^[^@[:space:]]+@([a-z0-9-]+\\.)+[a-z]{2,}$'`),
+  check('pending_email_check', sql`${t.pendingEmailNormalized} is null or (${t.pendingEmailNormalized} = lower(${t.pendingEmailNormalized}) and ${t.pendingEmailNormalized} ~ '^[^@[:space:]]+@([a-z0-9-]+\\.)+[a-z]{2,}$')`),
   uniqueIndex('account_pending_email_unique').on(t.pendingEmailNormalized),
 ]);
 

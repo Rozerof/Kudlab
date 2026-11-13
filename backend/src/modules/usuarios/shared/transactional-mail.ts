@@ -1,3 +1,4 @@
+import { emailDomainAllowed } from './accounts.validation.js';
 import nodemailer from 'nodemailer';
 import { z } from 'zod';
 import { loadEnv } from '../../../config/env.js';
@@ -11,7 +12,7 @@ export type MailOutcome = { outcome: 'accepted' | 'rejected' | 'unknown'; catego
 export type MailRequest = { purpose: MailPurpose; operationId: string; to: string; url: string };
 const controls = /[\u0000-\u001f\u007f]/;
 const inputSchema = z.object({ purpose: purposeSchema, operationId: z.uuid(),
-  to: z.email().refine((v) => !controls.test(v) && v.split('@')[1]?.toLowerCase().endsWith('.edu.co') === true),
+  to: z.email().refine((v) => !controls.test(v) && emailDomainAllowed(v)),
   url: z.string().url().refine((v) => !controls.test(v)) });
 export const capturedMail: (MailRequest & { from: { name: string; address: string }; subject: string; text: string; html: string })[] = [];
 

@@ -1,0 +1,4 @@
+ALTER TABLE "user_accounts" DROP CONSTRAINT "account_email_check";--> statement-breakpoint
+ALTER TABLE "user_accounts" DROP CONSTRAINT "pending_email_check";--> statement-breakpoint
+ALTER TABLE "user_accounts" ADD CONSTRAINT "account_email_check" CHECK ("user_accounts"."email_normalized" = lower("user_accounts"."email_normalized") and "user_accounts"."email_normalized" ~ '^[^@[:space:]]+@([a-z0-9-]+\.)+[a-z]{2,}$');--> statement-breakpoint
+ALTER TABLE "user_accounts" ADD CONSTRAINT "pending_email_check" CHECK ("user_accounts"."pending_email_normalized" is null or ("user_accounts"."pending_email_normalized" = lower("user_accounts"."pending_email_normalized") and "user_accounts"."pending_email_normalized" ~ '^[^@[:space:]]+@([a-z0-9-]+\.)+[a-z]{2,}$'));
