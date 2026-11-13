@@ -1,0 +1,42 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { captureEntry, resolveRoute } from '../../src/features/usuarios/navigation.ts';
+
+test('finite direct page routes, with no generic router or permission grant', () => {
+  for (const [path, kind] of [['/', 'entry'], ['/acceso', 'access'],
+    ['/usuarios', 'accounts'], ['/usuarios/nueva', 'invite'], ['/usuarios/account-1', 'detail'],
+    ['/usuarios/account-1/editar', 'edit'], ['/recuperar-acceso', 'recoveryRequest'],
+    ['/recuperar-acceso/confirmar', 'recoveryConfirm'], ['/acceso/invitacion', 'invitationAccept']]) {
+    assert.equal(resolveRoute(path, '').kind, kind);
+  }
+  assert.deepEqual(resolveRoute('/usuarios/id%20con%20espacio', ''), { kind: 'detail', accountId: 'id con espacio' });
+});
+
+test('deferred email change goes to login without retaining or consuming a token', () => {
+  for (const pathname of ['/acceso/cambio-correo']) {
+    for (const search of ['', '?token=synthetic', '?token=a&token=b']) {
+      const calls = [];
+      const entry = captureEntry({ pathname, search, hash: '#private' }, { replaceState: (...args) => calls.push(args) });
+      assert.deepEqual(calls, [[null, '', '/acceso']]);
+      assert.deepEqual(entry.route, { kind: 'access' });
+      assert.equal(entry.recovery.read(), undefined);
+    }
+  }
+  assert.equal(captureEntry({ pathname: '/acceso', search: '?token=synthetic', hash: '' }, { replaceState() {} }).route.kind, 'blockedLink');
+});
+
+test('unknown, malformed and excluded routes never turn into functional transactions', () => {
+  for (const path of ['/sesion', '/estudiantes', '/invitaciones/aceptar', '/correo/confirmar', '/usuarios/a/audit',
+    '/usuarios/a/reactivate', '/usuarios/a/b/editar', '/usuarios/%E0%A4%A', '/usuarios/%2F', '/usuarios/']) {
+    assert.deepEqual(resolveRoute(path, ''), { kind: 'unavailable' });
+  }
+});
+
+test('query tokens outside supported public routes block without classifying or exposing them', () => {
+  for (const path of ['/', '/acceso', '/usuarios', '/usuarios/a', '/recuperar-acceso', '/invitaciones/aceptar']) {
+    for (const query of ['?token=example', '?token=', '?token=a&token=b']) {
+      assert.deepEqual(resolveRoute(path, query), { kind: 'blockedLink' });
+    }
+  }
+  assert.deepEqual(resolveRoute('/recuperar-acceso/confirmar', '?token=example'), { kind: 'recoveryConfirm' });
+});
