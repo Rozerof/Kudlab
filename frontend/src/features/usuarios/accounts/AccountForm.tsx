@@ -52,7 +52,7 @@ function Editor({ api, account, review, refreshing, locked }: { api: UsuariosApi
     const saved = mutation.result.data;
     return <div className="staff-stack"><header className="workspace-page-heading"><h1 id="auth-title" className="auth-heading" tabIndex={-1}>{editing ? 'Cambios guardados' : 'Cuenta creada'}</h1><p>{editing ? 'Los datos de la cuenta se han actualizado.' : 'La cuenta docente se ha creado y queda pendiente de activación.'}</p></header>
       <Card className="staff-form"><CardHeader><h2 className="staff-section-title">{saved.name}</h2><p className="[overflow-wrap:anywhere]">{saved.email}</p></CardHeader><CardContent>
-        {(saved.status === 'PENDIENTE' || saved.pendingEmail) && <Notice title={saved.status === 'PENDIENTE' ? 'La cuenta está pendiente de activación' : 'El nuevo correo sigue pendiente'}><p>{saved.status === 'PENDIENTE' ? 'La activación por invitación aún no está disponible. Este profesor todavía no puede iniciar sesión.' : 'La confirmación de cambio de correo aún no está disponible. El profesor debe seguir usando su correo vigente.'}</p></Notice>}
+        {(saved.status === 'PENDIENTE' || saved.pendingEmail) && <Notice title={saved.status === 'PENDIENTE' ? 'La cuenta está pendiente de activación' : 'El nuevo correo sigue pendiente'}><p>{saved.status === 'PENDIENTE' ? 'Este profesor podrá iniciar sesión cuando acepte la invitación enviada a su correo.' : 'La confirmación de cambio de correo aún no está disponible. El profesor debe seguir usando su correo vigente.'}</p></Notice>}
         {saved.pendingEmail && <p>Correo pendiente de confirmación: <strong>{saved.pendingEmail}</strong>. El correo vigente no ha cambiado.</p>}
         {saved.status === 'PENDIENTE' && <Delivery account={saved} />}
         <div className="staff-actions"><ActionLink href={`/usuarios/${encodeURIComponent(saved.id)}`} primary>Ver cuenta</ActionLink><ActionLink href="/usuarios">Volver a profesores</ActionLink></div>
@@ -64,7 +64,7 @@ function Editor({ api, account, review, refreshing, locked }: { api: UsuariosApi
       <h1 id="auth-title" className="auth-heading" tabIndex={-1}>{editing ? 'Editar cuenta' : 'Invitar profesor'}</h1>
       <p>{editing ? 'Actualiza el nombre o solicita un cambio de correo.' : 'Crea una cuenta docente pendiente. No se asigna una contraseña desde aquí.'}</p>
     </CardHeader><CardContent>
-      <InlineHelp>{!editing ? 'La activación por invitación aún no está disponible. La cuenta se creará pendiente.' : account?.status === 'PENDIENTE' ?
+      <InlineHelp>{!editing ? 'La cuenta se creará pendiente y el profesor recibirá un correo para activarla.' : account?.status === 'PENDIENTE' ?
         'El cambio de correo reemite la invitación. Su aceptación aún no está disponible.' :
         'La confirmación del nuevo correo aún no está disponible. El cambio no se completa desde aquí.'}</InlineHelp>
       {account && <div><p className="font-semibold">Correo vigente</p><p className="[overflow-wrap:anywhere]">{account.email}</p>{account.pendingEmail && <p className="mt-2 [overflow-wrap:anywhere]">Pendiente de confirmación: {account.pendingEmail}</p>}</div>}

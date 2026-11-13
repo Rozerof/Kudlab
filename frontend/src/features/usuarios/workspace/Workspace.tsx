@@ -61,7 +61,7 @@ export function Dashboard({ user }: { user: Identity }) {
           <div><h3 className="font-semibold">{feature.title}</h3><p>{feature.description}</p></div>
           <ActionLink href={feature.href} primary={feature === features[0]}>{feature.action}<ArrowRight className="size-5" aria-hidden="true" /></ActionLink>
         </div>)}</div>
-        {user.role === 'ADMIN' && <p className="dashboard-note">Las cuentas nuevas quedan pendientes: la activación por invitación aún no está disponible.</p>}
+        {user.role === 'ADMIN' && <p className="dashboard-note">Las cuentas nuevas quedan pendientes hasta que el profesor acepte la invitación enviada a su correo.</p>}
       </section>}
       <Card className="dashboard-account" aria-labelledby="dashboard-account-title"><CardHeader><h2 id="dashboard-account-title" className="staff-section-title">Tu cuenta</h2><UserRound className="dashboard-account-icon" aria-hidden="true" /></CardHeader>
         <CardContent><dl className="account-facts"><div><dt>Nombre</dt><dd>{user.name}</dd></div><div><dt>Correo</dt><dd>{user.email}</dd></div><div><dt>Rol</dt><dd>{roleLabel[user.role]}</dd></div></dl>
