@@ -362,3 +362,12 @@
   .auth-hero-title span { color: #ea7a2a; }
   .auth-hero-text { max-width: 32rem; font-size: 1.125rem; line-height: 1.6; }
 }
+
+/* Ficha del estudiante: secciones desplegables. */
+.student-section { border: 1px solid var(--border); border-radius: .875rem; background: var(--background, #fff); }
+.student-section-summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; cursor: pointer; padding: 1rem 1.25rem; font-size: 1.0625rem; font-weight: 600; list-style: none; }
+.student-section-summary::-webkit-details-marker { display: none; }
+.student-section-summary::after { content: '▾'; margin-left: auto; transition: transform .15s; }
+.student-section[open] > .student-section-summary::after { transform: rotate(180deg); }
+.student-section-hint { margin-left: auto; font-size: .8125rem; font-weight: 500; padding: .125rem .625rem; border-radius: 999px; background: var(--surface-subtle, #f1f5f9); }
+.student-section-body { display: grid; gap: 1.5rem; padding: 0 1.25rem 1.25rem; }

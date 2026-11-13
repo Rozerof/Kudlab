@@ -165,16 +165,36 @@ export function StudentDetail({ api, readApi, activities, consents, observations
         {checking && !query.fetching && <div className="staff-stack mt-4"><p role="status">Estado confirmado por lectura: {student.isActive ? 'activo' : 'inactivo'}. Revisa también el código y los nombres antes de decidir otro guardado.</p><Button variant="outline" onClick={() => { reviewed(); setChecking(false); }}>Ya revisé el registro</Button></div>}
       </Notice>}
       {refresh.status !== 'ready' && <p role="status">{query.fetching ? 'Comprobando el estado actual…' : 'La ficha no está actualizada. Las escrituras esperan una nueva comprobación.'}</p>}
+      <StudentIndicatorsLink student={student} />
+      <Section title="Consentimiento informado" hint={snapshot?.consent.state === 'CURRENT' ? 'Vigente' : snapshot?.consent.state === 'REVOKED' ? 'Revocado' : 'Pendiente'} open={snapshot !== undefined && snapshot.consent.state !== 'CURRENT'}>
       {lease && <StudentConsent key={`${apiOrigin}:${actorId}:${student.id}:${student.groupId}`} api={consents} studentId={studentId} actorId={actorId} snapshot={snapshot} refresh={refresh} lease={lease} recheck={recheckSelection}
         onChange={change => { if (activeSequence === sequence.current && lease.valid() && change.studentId === studentId) query.reload(); }} />}
-      {lease && <StudentObservations key={`observations:${apiOrigin}:${actorId}:${student.id}:${student.groupId}`} api={observations} apiOrigin={apiOrigin} actorId={actorId} student={student} refresh={refresh} consentState={snapshot?.consent.state} draft={lease.slot('observations')} lease={lease} recheck={recheckSelection} onAccessLost={lostSelection} />}
+      </Section>
+      <Section title="Actividades digitales">
       <StudentAssignments key={student.id} api={activities} student={student} refresh={refresh} />
+      </Section>
+      <Section title="Observaciones docentes">
+      {lease && <StudentObservations key={`observations:${apiOrigin}:${actorId}:${student.id}:${student.groupId}`} api={observations} apiOrigin={apiOrigin} actorId={actorId} student={student} refresh={refresh} consentState={snapshot?.consent.state} draft={lease.slot('observations')} lease={lease} recheck={recheckSelection} onAccessLost={lostSelection} />}
+      </Section>
+      <Section title="Notas académicas">
       <StudentNotes key={`notes:${student.id}`} api={notes} student={student} refresh={refresh} />
+      </Section>
+      <Section title="Anotaciones">
       {lease && <StudentAnnotations key={`annotations:${apiOrigin}:${actorId}:${student.id}:${student.groupId}`} api={annotations} student={student} refresh={refresh} draft={lease.slot('annotations')} lease={lease} recheck={recheckSelection} onAccessLost={lostSelection} />}
-      <StudentIndicatorsLink student={student} />
+      </Section>
+      <Section title="Opciones del registro">
       {student.isActive ? <Deactivate api={api} student={student} locked={Boolean(write) || refresh.status !== 'ready'} onSuccess={() => { setNotice('Estudiante inactivado'); query.reload(); }} review={check} /> : <p>Este registro está inactivo. Un nuevo consentimiento confirmado permite reactivarlo.</p>}
+      </Section>
     </> : <><Heading>Ficha de estudiante</Heading>{query.fetching || !failure ? <Loading text="Consultando estudiante" /> : <Failure result={failure} retry={query.reload} />}</>}
   </div>;
+}
+
+// Sección desplegable de la ficha: el contenido sigue montado (conserva borradores) aunque esté cerrada.
+function Section({ title, hint, open = false, children }: { title: string; hint?: string; open?: boolean; children: React.ReactNode }) {
+  return <details className="student-section" open={open || undefined}>
+    <summary className="student-section-summary"><span>{title}</span>{hint && <span className="student-section-hint">{hint}</span>}</summary>
+    <div className="student-section-body">{children}</div>
+  </details>;
 }
 
 function Deactivate({ api, student, locked, onSuccess, review }: { api: StudentsApi; student: Student; locked: boolean; onSuccess(): void; review(): void }) {
