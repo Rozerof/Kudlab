@@ -24,7 +24,7 @@ export function IndicatorDefinitionView({ api, metricCode }: { api: IndicatorsAp
         <Item term="Tarea">{found.taskId}</Item>
         <Item term="Qué mide">{found.description}</Item>
         <Item term="Cómo se calcula">{found.calculation}</Item>
-        <Item term="Unidad">{found.unit === '%' ? 'Porcentaje (%)' : 'Milisegundos (ms)'}</Item>
+        <Item term="Unidad">{found.unit === '%' ? 'Porcentaje (%)' : found.unit === 'ms' ? 'Milisegundos (ms)' : found.unit === 'pts' ? 'Puntos porcentuales' : 'Ítems'}</Item>
         <Item term="Datos necesarios">{found.inputs}</Item>
         <Item term="Alcances">{found.scopes.map(s => SCOPE_LABELS[s]).join(', ')}</Item>
         <Item term="Qué no cuenta">{found.exclusions}</Item>

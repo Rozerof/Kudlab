@@ -57,7 +57,7 @@ export function parseDefinitions(value: unknown): IndicatorDefinition[] | undefi
     if (rule === undefined) return;
     items.push({ ...(raw as unknown as IndicatorDefinition), rule });
   }
-  return new Set(items.map(i => i.metricCode)).size === items.length ? items : undefined;
+  return new Set(items.map(i => `${i.taskId}:${i.metricCode}`)).size === items.length ? items : undefined;
 }
 
 function parseIndicator(v: unknown): HistoryIndicator | undefined {
