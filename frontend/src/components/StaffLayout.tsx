@@ -16,7 +16,7 @@ export function StaffLayout({ children, wide = false }: { children: ReactNode; w
       <main id="contenido" className="auth-main">{children}</main>
       <section className="auth-hero" aria-label="Presentación">
         <p className="auth-hero-kicker">Para docentes de primaria</p>
-        <h2 className="auth-hero-title">Aprender jugando.<br /><span>Acompañar mejor.</span></h2>
+        <h2 className="auth-hero-title">Aprender jugando,<br /><span>crecer acompañados.</span></h2>
         <p className="auth-hero-text">Actividades digitales, observación docente e indicadores de atención y memoria conectados en un solo lugar. Apoyo pedagógico, no diagnóstico.</p>
       </section>
     </div>

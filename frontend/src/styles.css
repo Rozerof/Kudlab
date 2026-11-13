@@ -64,8 +64,8 @@
   --color-action-primary-hover: var(--action-primary-hover);
   --color-switch-active: var(--switch-active);
   --color-muted: var(--muted-foreground);
-  --radius-lg: .5rem;
-  --radius-xl: .75rem;
+  --radius-lg: .75rem;
+  --radius-xl: 1rem;
 }
 
 @layer base {
@@ -371,3 +371,19 @@
 .student-section[open] > .student-section-summary::after { transform: rotate(180deg); }
 .student-section-hint { margin-left: auto; font-size: .8125rem; font-weight: 500; padding: .125rem .625rem; border-radius: 999px; background: var(--surface-subtle, #f1f5f9); }
 .student-section-body { display: grid; gap: 1.5rem; padding: 0 1.25rem 1.25rem; }
+
+/* Acabado visual: superficies suaves, tarjetas con sombra ligera y acento naranja de KudLab. */
+:root { --accent-orange: #e8762a; --shadow-card: 0 1px 2px rgb(20 38 77 / .06), 0 8px 24px -12px rgb(20 38 77 / .18); }
+body { font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+.workspace-page, .workspace-content { background: var(--surface-subtle); }
+.workspace-toolbar { box-shadow: 0 1px 0 var(--border), 0 6px 16px -14px rgb(20 38 77 / .35); }
+.auth-heading { font-weight: 700; letter-spacing: -.02em; }
+.workspace-page-heading .auth-heading::after, .staff-heading .auth-heading::after { content: ''; display: block; width: 3rem; height: .3rem; margin-top: .6rem; border-radius: 999px; background: var(--accent-orange); }
+.staff-section-title { letter-spacing: -.01em; }
+.dashboard-tasks, .staff-panel, .staff-table-region, .student-section, .activity-form, [data-slot='card'] { border-color: #e3e8f1; border-radius: 1rem; box-shadow: var(--shadow-card); background: var(--card); }
+.dashboard-task:last-child { border-bottom: 0; }
+.staff-table-region thead tr, .staff-table-region tr:first-child th { background: var(--surface-subtle); }
+.staff-table-region tbody tr { transition: background-color .15s; }
+.staff-table-region tbody tr:hover { background: #f8fafd; }
+.student-section-summary:hover { background: #f8fafd; border-radius: 1rem; }
+.student-section[open] > .student-section-summary { border-bottom: 1px solid var(--border); border-radius: 1rem 1rem 0 0; margin-bottom: 1.25rem; }
