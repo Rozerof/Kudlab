@@ -1,8 +1,9 @@
+import type { Unit } from './types.ts';
 import { metricLabels, processingLabels, unavailableLabels } from './copy.ts';
 import type { HistoryIndicator, HistorySession, MetricCode } from './types.ts';
 
 const TIME_ZONE = 'America/Bogota';
-export const formatValue = (value: number | null, unit: '%' | 'ms') => value === null ? '—' : `${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 }).format(value)} ${unit}`;
+export const formatValue = (value: number | null, unit: Unit) => value === null ? '—' : `${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 }).format(value)} ${unit}`;
 export const longDate = (iso: string) => new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeStyle: 'short', timeZone: TIME_ZONE }).format(new Date(iso));
 export const shortDate = (iso: string) => new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'short', timeZone: TIME_ZONE }).format(new Date(iso)).replace('.', '');
 

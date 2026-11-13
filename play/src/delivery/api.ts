@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { contextSchema, receiptSchema, secretSchema, startResponseSchema, uuid, uuidV4, type Receipt, type SessionContext } from '../contract/schema';
+import { contextSchema, externalContextSchema, receiptSchema, secretSchema, startResponseSchema, uuid, uuidV4, type AnyContext, type Receipt } from '../contract/schema';
 import { hash } from '../contract/canonical';
 import { normalizeCode } from '../runtime/access-code';
 
@@ -34,21 +34,22 @@ export class Api {
     if (text.length > 1048576) throw new ApiError(0, 'INVALID_RESPONSE');
     try { return JSON.parse(text); } catch { throw new ApiError(0, 'INVALID_RESPONSE'); }
   }
-  private async verifiedContext(input: unknown): Promise<SessionContext> {
-    const context = contextSchema.parse(input);
+  private async verifiedContext(input: unknown): Promise<AnyContext> {
+    const external = !!input && typeof input === 'object' && (input as { contractVersion?: unknown }).contractVersion === 'ext-1';
+    const context: AnyContext = external ? externalContextSchema.parse(input) : contextSchema.parse(input);
     if (await hash(context.config) !== context.configurationHash) throw new ApiError(409, 'CONFIGURATION_HASH_MISMATCH');
     return context;
   }
-  async claim(grant: string, claimId: string, runtimeSecret: string): Promise<SessionContext> {
+  async claim(grant: string, claimId: string, runtimeSecret: string): Promise<AnyContext> {
     uuidV4.parse(claimId); secretSchema.parse(runtimeSecret);
     return this.verifiedContext(await this.call('/launches/claim', grant, JSON.stringify({ claimId, runtimeSecret })));
   }
-  async access(code: string, claimId: string, runtimeSecret: string, recovery?: { sessionId: string; submissionId: string }): Promise<SessionContext> {
+  async access(code: string, claimId: string, runtimeSecret: string, recovery?: { sessionId: string; submissionId: string }): Promise<AnyContext> {
     uuidV4.parse(claimId); secretSchema.parse(runtimeSecret);
     if (recovery) { uuid.parse(recovery.sessionId); uuidV4.parse(recovery.submissionId); }
     return this.verifiedContext(await this.call(recovery ? '/access/recover' : '/access/claim', undefined, JSON.stringify({ code: normalizeCode(code), claimId, runtimeSecret, ...recovery })));
   }
-  async context(sessionId: string, secret: string): Promise<SessionContext> {
+  async context(sessionId: string, secret: string): Promise<AnyContext> {
     uuid.parse(sessionId);
     const c = await this.verifiedContext(await this.call(`/sessions/${sessionId}`, secret));
     if (c.sessionId !== sessionId) throw new ApiError(409, 'SESSION_MISMATCH');

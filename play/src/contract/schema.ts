@@ -55,6 +55,22 @@ export const contextSchema = z.strictObject({
   if (c.capabilities.canSubmit && (!c.uploadAllowedUntil || c.attemptNumber === null)) ctx.addIssue({ code: 'custom', message: 'Context not submittable' });
 });
 export type SessionContext = z.infer<typeof contextSchema>;
+// Juegos externos TG-02 a TG-04 (contrato «ext-1» del backend). Se ejecutan en un marco aislado del mismo origen.
+export const EXTERNAL_GAMES = Object.freeze({
+  'TG-02': { slug: 'tg-02', title: 'Palabra intrusa', build: 'td-palabra-intrusa-1' },
+  'TG-03': { slug: 'tg-03', title: 'Mentalista', build: 'td-mentalista-1' },
+  'TG-04': { slug: 'tg-04', title: 'Kud Dice', build: 'td-kud-dice-1' },
+} as const);
+export const externalContextSchema = z.strictObject({
+  sessionId: uuid, taskId: z.enum(['TG-02', 'TG-03', 'TG-04']), publishedVersionId: uuid, configVersion: z.number().int().positive(),
+  configurationHash: digest, gameBuildId: z.string().min(1).max(64), contractVersion: z.literal('ext-1'), config: z.record(z.string(), z.unknown()),
+  executionStatus: z.string().min(1).max(64), attemptNumber: z.number().int().min(1).max(10).nullable(),
+  startAllowedUntil: utc, uploadAllowedUntil: utc.nullable(), serverTime: utc,
+  capabilities: z.strictObject({ canStart: z.boolean(), canSubmit: z.boolean(), canReadReceipt: z.boolean() }),
+}).superRefine((c, ctx) => { if (EXTERNAL_GAMES[c.taskId].build !== c.gameBuildId) ctx.addIssue({ code: 'custom', message: 'Build mismatch' }); });
+export type ExternalContext = z.infer<typeof externalContextSchema>;
+export type AnyContext = SessionContext | ExternalContext;
+export const isExternal = (c: AnyContext): c is ExternalContext => c.contractVersion === 'ext-1';
 export const reasonSchema = z.enum(['time_limit', 'user_exit', 'visibility_lost', 'script_error', 'storage_failure', 'frame_gap', 'layout_changed', 'recovered_after_reload', 'evidence_limit', 'resource_error']);
 export type TerminationReason = z.infer<typeof reasonSchema>;
 export const trialSchema = z.strictObject({

@@ -1809,7 +1809,7 @@ paths:
           required: false
           schema:
             type: string
-            const: TG-01
+            enum: [ TG-01, TG-02, TG-03, TG-04 ]
         - name: metricCode
           in: query
           required: false
@@ -1954,7 +1954,7 @@ paths:
           required: false
           schema:
             type: string
-            const: TG-01
+            enum: [ TG-01, TG-02, TG-03, TG-04 ]
       responses:
         "200":
           description: Respuesta confirmada; no-store.
@@ -4907,13 +4907,13 @@ components:
               reason: { type: string, enum: [ STUDENT_INACTIVE, CONSENT_REQUIRED, AUTHOR_REQUIRED, CORRECTION_CLOSED, STALE_VERSION, REQUEST_MISMATCH ] }
     IndicatorMetricCode:
       type: string
-      enum: [ accuracy_pct, omission_rate_pct, commission_rate_pct, median_reaction_time_ms, rt_sd_ms, rt_cv_pct ]
+      enum: [ accuracy_pct, omission_rate_pct, commission_rate_pct, median_reaction_time_ms, rt_sd_ms, rt_cv_pct, precision_pct, error_rate_pct, position_accuracy_pct, longest_correct_length, order_error_rate_pct, load_precision_change_pts ]
     IndicatorScope:
       type: string
       enum: [ SESSION, SEGMENT_1, SEGMENT_2, SEGMENT_3 ]
     IndicatorUnavailabilityReason:
       type: string
-      enum: [ NO_VALID_TARGETS, NO_VALID_DISTRACTORS, NO_VALID_RT, INSUFFICIENT_RT_FOR_VARIABILITY, SEGMENT_NOT_REACHED, TECHNICAL_EXCLUSION, ZERO_MEAN_RT, METHOD_NOT_APPROVED ]
+      enum: [ NO_VALID_TARGETS, NO_VALID_DISTRACTORS, NO_VALID_RT, INSUFFICIENT_RT_FOR_VARIABILITY, SEGMENT_NOT_REACHED, TECHNICAL_EXCLUSION, ZERO_MEAN_RT, METHOD_NOT_APPROVED, NO_VALID_TRIALS, INSUFFICIENT_RT, NO_CORRECT_TRIALS, INSUFFICIENT_LOAD_DATA ]
     IndicatorRuleRef:
       type: object
       additionalProperties: false
@@ -4934,11 +4934,11 @@ components:
       required: [ metricCode, taskId, label, description, calculation, unit, scopes, inputs, unavailabilityReasons, exclusions, rule ]
       properties:
         metricCode: { $ref: '#/components/schemas/IndicatorMetricCode' }
-        taskId: { type: string, const: TG-01 }
+        taskId: { type: string, enum: [ TG-01, TG-02, TG-03, TG-04 ] }
         label: { type: string, minLength: 1 }
         description: { type: string, minLength: 1 }
         calculation: { type: string, minLength: 1 }
-        unit: { type: string, enum: [ "%", ms ] }
+        unit: { type: string, enum: [ "%", ms, items, pts ] }
         scopes: { type: array, minItems: 1, items: { $ref: '#/components/schemas/IndicatorScope' } }
         inputs: { type: string, minLength: 1 }
         unavailabilityReasons: { type: array, items: { $ref: '#/components/schemas/IndicatorUnavailabilityReason' } }
@@ -4963,7 +4963,7 @@ components:
         scope: { $ref: '#/components/schemas/IndicatorScope' }
         status: { type: string, enum: [ CALCULATED, NOT_AVAILABLE ] }
         value: { type: [ number, "null" ] }
-        unit: { type: string, enum: [ "%", ms ] }
+        unit: { type: string, enum: [ "%", ms, items, pts ] }
         numerator: { type: [ integer, "null" ], minimum: 0 }
         denominator: { type: [ integer, "null" ], minimum: 0 }
         sampleSize: { type: integer, minimum: 0 }
@@ -4978,7 +4978,7 @@ components:
       description: occurredAt es el inicio autorizado por el servidor. detailAccess indica si el docente actual puede abrir el detalle; no se expone asignación ni curso de origen.
       properties:
         sessionId: { type: string, format: uuid }
-        taskId: { type: string, const: TG-01 }
+        taskId: { type: string, enum: [ TG-01, TG-02, TG-03, TG-04 ] }
         attemptNumber: { type: [ integer, "null" ], minimum: 1, maximum: 10 }
         occurredAt: { type: string, format: date-time }
         executionStatus: { type: string, enum: [ READY, RUNNING, COMPLETED, INTERRUPTED, EXPIRED, UNCONFIRMED ] }
@@ -5800,7 +5800,7 @@ components:
           pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
         taskId:
           type: string
-          const: TG-01
+          enum: [ TG-01, TG-02, TG-03, TG-04 ]
         publishedVersionId:
           type: string
           pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
@@ -6086,7 +6086,7 @@ components:
           pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
         taskId:
           type: string
-          const: TG-01
+          enum: [ TG-01, TG-02, TG-03, TG-04 ]
         publishedVersionId:
           type: string
           pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
@@ -6445,7 +6445,7 @@ components:
           pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
         taskId:
           type: string
-          const: TG-01
+          enum: [ TG-01, TG-02, TG-03, TG-04 ]
         title:
           type: string
           minLength: 1
@@ -6563,7 +6563,7 @@ components:
           pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
         taskId:
           type: string
-          const: TG-01
+          enum: [ TG-01, TG-02, TG-03, TG-04 ]
         title:
           type: string
           minLength: 1
@@ -6637,7 +6637,7 @@ components:
                 pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
               taskId:
                 type: string
-                const: TG-01
+                enum: [ TG-01, TG-02, TG-03, TG-04 ]
               title:
                 type: string
                 minLength: 1
@@ -6714,7 +6714,7 @@ components:
           pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
         taskId:
           type: string
-          const: TG-01
+          enum: [ TG-01, TG-02, TG-03, TG-04 ]
         publishedVersionId:
           type: string
           pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
@@ -6796,7 +6796,7 @@ components:
           pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
         taskId:
           type: string
-          const: TG-01
+          enum: [ TG-01, TG-02, TG-03, TG-04 ]
         assignmentId:
           type: string
           pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
@@ -6886,7 +6886,7 @@ components:
           pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
         taskId:
           type: string
-          const: TG-01
+          enum: [ TG-01, TG-02, TG-03, TG-04 ]
         assignmentId:
           type: string
           pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
@@ -7208,7 +7208,7 @@ components:
                   pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
                 ruleCode:
                   type: string
-                  const: TG01-DESCRIPTIVE-1
+                  pattern: ^TG0[1-4]-DESCRIPTIVE-[0-9]+$
                 ruleVersion:
                   type: integer
                   exclusiveMinimum: 0
@@ -7245,6 +7245,12 @@ components:
                           - median_reaction_time_ms
                           - rt_sd_ms
                           - rt_cv_pct
+                          - precision_pct
+                          - error_rate_pct
+                          - position_accuracy_pct
+                          - longest_correct_length
+                          - order_error_rate_pct
+                          - load_precision_change_pts
                       scope:
                         type: string
                         enum:
@@ -7266,6 +7272,8 @@ components:
                         enum:
                           - "%"
                           - ms
+                          - items
+                          - pts
                       numerator:
                         anyOf:
                           - type: integer
@@ -7358,7 +7366,7 @@ components:
                 pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
               taskId:
                 type: string
-                const: TG-01
+                enum: [ TG-01, TG-02, TG-03, TG-04 ]
               assignmentId:
                 type: string
                 pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
@@ -8036,7 +8044,7 @@ components:
                 pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
               taskId:
                 type: string
-                const: TG-01
+                enum: [ TG-01, TG-02, TG-03, TG-04 ]
               title:
                 type: string
                 minLength: 1

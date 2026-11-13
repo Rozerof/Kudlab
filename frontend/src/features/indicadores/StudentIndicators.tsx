@@ -16,19 +16,19 @@ import { Heading } from './IndicatorCatalog';
 import { IndicatorChart } from './IndicatorChart';
 import { PedagogicalNotice } from './PedagogicalNotice';
 import { buildRows } from './rows.ts';
-import { metricCodes, scopes, type MetricCode, type Scope } from './types.ts';
+import { scopes, taskIds, taskMetrics, taskTitles, type MetricCode, type Scope, type TaskId } from './types.ts';
 
-type Filters = { metric: MetricCode | 'all'; scope: Scope; from: string; to: string };
-const defaults: Filters = { metric: 'all', scope: 'SESSION', from: '', to: '' };
+type Filters = { task: TaskId; metric: MetricCode | 'all'; scope: Scope; from: string; to: string };
+const defaults: Filters = { task: 'TG-01', metric: 'all', scope: 'SESSION', from: '', to: '' };
 const select = 'staff-select font-medium';
-const toFilter = (f: Filters): HistoryFilter => ({ ...(f.metric !== 'all' ? { metricCode: f.metric } : {}), scope: f.scope, ...(f.from ? { from: f.from } : {}), ...(f.to ? { to: f.to } : {}) });
+const toFilter = (f: Filters): HistoryFilter => ({ taskId: f.task, ...(f.metric !== 'all' ? { metricCode: f.metric } : {}), scope: f.scope, ...(f.from ? { from: f.from } : {}), ...(f.to ? { to: f.to } : {}) });
 const describe = (f: HistoryFilter) => [f.metricCode ? metricLabel(f.metricCode) : 'todos los indicadores', f.scope ? SCOPE_LABELS[f.scope] : '', f.from ? `desde ${f.from}` : '', f.to ? `hasta ${f.to}` : ''].filter(Boolean).join(', ');
 const rangeText = (f: Filters) => f.from || f.to ? `${f.from || 'inicio'} a ${f.to || 'hoy'}` : 'todas las fechas';
 const rangeMessages = { range: 'La fecha inicial no puede ser posterior a la final. No se consulta hasta corregirla.', date: 'Escribe fechas reales con el formato del selector.', metric: 'Indicador no válido.', scope: 'Alcance no válido.' };
 
 // Historia descriptiva de indicadores de un estudiante (D-1…D-8). Solo lectura; no compara ni calcula diferencias entre sesiones.
 export function StudentIndicators({ api, studentId, studentName, groupId, onRevalidate }: { api: IndicatorsApi; studentId: string; studentName: string; groupId: string; onRevalidate(): void }) {
-  const ids = { metric: useId(), scope: useId(), from: useId(), to: useId(), err: useId() };
+  const ids = { task: useId(), metric: useId(), scope: useId(), from: useId(), to: useId(), err: useId() };
   const [filters, setFilters] = useState<Filters>(defaults);
   const apiFilter = toFilter(filters), invalid = filterError(apiFilter), key = `${studentId}|${JSON.stringify(apiFilter)}`;
   const [state, dispatch] = useReducer(reduce, key, initialState);
@@ -46,15 +46,17 @@ export function StudentIndicators({ api, studentId, studentName, groupId, onReva
     void api.history(studentId, apiFilter, new AbortController().signal, state.nextCursor).then(result => dispatch({ type: 'result', key, append: true, result }));
   };
   const change = (patch: Partial<Filters>) => setFilters(f => ({ ...f, ...patch }));
-  const isDefault = filters.metric === defaults.metric && filters.scope === defaults.scope && !filters.from && !filters.to;
+  const isDefault = filters.task === defaults.task && filters.metric === defaults.metric && filters.scope === defaults.scope && !filters.from && !filters.to;
   return <div className="staff-stack">
     <Heading>Historia de indicadores</Heading>
-    <p>{studentName} · Tarea TG-01</p>
+    <p>{studentName} · {filters.task} {taskTitles[filters.task]}</p>
     <PedagogicalNotice />
     <form className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Filtros de la historia" onSubmit={e => e.preventDefault()}>
+      <div className="grid gap-2"><Label htmlFor={ids.task}>Actividad</Label>
+        <select id={ids.task} className={select} value={filters.task} onChange={e => change({ task: e.target.value as TaskId, metric: 'all', scope: 'SESSION' })}>{taskIds.map(t => <option key={t} value={t}>{t} · {taskTitles[t]}</option>)}</select></div>
       <div className="grid gap-2"><Label htmlFor={ids.metric}>Indicador</Label>
         <select id={ids.metric} className={select} value={filters.metric} onChange={e => change({ metric: e.target.value as Filters['metric'] })}>
-          <option value="all">Todos los indicadores</option>{metricCodes.map(m => <option key={m} value={m}>{metricLabel(m)}</option>)}</select></div>
+          <option value="all">Todos los indicadores</option>{taskMetrics[filters.task].map(m => <option key={m} value={m}>{metricLabel(m)}</option>)}</select></div>
       <div className="grid gap-2"><Label htmlFor={ids.scope}>Alcance</Label>
         <select id={ids.scope} className={select} value={filters.scope} onChange={e => change({ scope: e.target.value as Scope })}>{scopes.map(s => <option key={s} value={s}>{SCOPE_LABELS[s]}</option>)}</select></div>
       <div className="grid gap-2"><Label htmlFor={ids.from}>Desde</Label><Input id={ids.from} type="date" value={filters.from} aria-invalid={invalid ? true : undefined} aria-describedby={invalid ? ids.err : undefined} onChange={e => change({ from: e.target.value })} /></div>
@@ -82,7 +84,7 @@ function Content({ state, filters, studentName, groupId, studentId, more, retry,
     </>;
   }
   if (state.status === 'empty') return <div className="grid gap-2 rounded-lg border border-border p-4" role="status"><p className="font-semibold">No hay sesiones para estos filtros</p>
-    <p>{state.good && state.good.items.length ? 'Prueba con otro rango de fechas o quita los filtros.' : 'Este estudiante aún no tiene sesiones con indicadores en la tarea TG-01. Esto no es un error ni un resultado de cero.'}</p></div>;
+    <p>{state.good && state.good.items.length ? 'Prueba con otro rango de fechas o quita los filtros.' : 'Este estudiante aún no tiene sesiones con indicadores en esta actividad. Esto no es un error ni un resultado de cero.'}</p></div>;
   return <Results items={state.items} nextCursor={state.nextCursor} filters={filters} {...{ studentName, groupId, studentId }} more={more} moreFailed={state.moreFailed} fetching={state.fetching} />;
 }
 

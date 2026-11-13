@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { calculate, RULE } from '../../src/modules/evolucion/tg01.js';
-import { INDICATOR_DEFINITIONS, UNAVAILABILITY_REASONS } from '../../src/modules/evolucion/read/definitions.js';
+import { EXTERNAL_INDICATOR_DEFINITIONS, INDICATOR_DEFINITIONS, UNAVAILABILITY_REASONS } from '../../src/modules/evolucion/read/definitions.js';
 import type { Envelope } from '../../src/modules/tareas/runtime/contract.js';
 
 const envelope = {
@@ -33,7 +33,9 @@ describe('catálogo de indicadores TG-01', () => {
     const source = readFileSync(new URL('../../src/modules/evolucion/tg01.ts', import.meta.url), 'utf8');
     const declared = new Set(INDICATOR_DEFINITIONS.flatMap(d => d.unavailabilityReasons));
     for (const reason of declared) expect(source).toContain(`'${reason}'`);
-    expect([...declared].sort()).toEqual([...UNAVAILABILITY_REASONS].sort());
+    // TG-02 a TG-04 declaran sus propios motivos (external.ts); juntos cubren la lista pública.
+    const all = new Set([...declared, ...EXTERNAL_INDICATOR_DEFINITIONS.flatMap(d => d.unavailabilityReasons)]);
+    expect([...all].sort()).toEqual([...UNAVAILABILITY_REASONS].sort());
     const inSource = [...source.matchAll(/'((?:NO_VALID|INSUFFICIENT|SEGMENT_NOT|TECHNICAL_EXCLUSION|ZERO_MEAN|METHOD_NOT)[A-Z0-9_]*)'/g)].map(m => m[1]!);
     expect(inSource.length).toBeGreaterThan(0);
     for (const reason of new Set(inSource)) expect(declared.has(reason as never)).toBe(true);

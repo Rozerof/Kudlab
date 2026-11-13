@@ -3,7 +3,8 @@ import { Delivery, type DeliveryState } from '../delivery/outbox';
 import { Session, type Credential } from '../runtime/session';
 import { Database } from '../storage/database';
 import { Journal, type Outbox, type Snapshot } from '../evidence/journal';
-import { type SessionContext, type TerminationReason, uuidV4, VIEWPORT_PROFILE, isViewportConfig } from '../contract/schema';
+import { type SessionContext, type TerminationReason, uuidV4, VIEWPORT_PROFILE, isViewportConfig, isExternal, EXTERNAL_GAMES, type ExternalContext } from '../contract/schema';
+import { runExternal, retryPendingExternal } from '../external/runner';
 import { Engine, resolveConfig, stageLayout } from '../games/tg01/engine';
 import { CanvasView } from '../games/tg01/canvas';
 import { SupervisedBridge } from '../bridge/supervised';
@@ -58,6 +59,7 @@ export class App {
   private leaseTimer?: ReturnType<typeof setInterval>;
   private maintenanceTimer?: ReturnType<typeof setInterval>;
   private main = el('main', 'main');
+  private externalActive = false;
   private live = el('p', 'sr-only');
   private startButton?: HTMLButtonElement;
   private reasonNode?: HTMLElement;
@@ -151,8 +153,9 @@ export class App {
     this.claiming = true;
     this.status = 'Confirmando tu actividad con el profesor…'; this.refreshAvailability();
     try {
-      this.context = await this.session!.claim(grant, this.bridgeId ?? undefined);
-      if (!supported(this.context)) throw new Error('VERSION_UNSUPPORTED');
+      const claimed = await this.session!.claim(grant, this.bridgeId ?? undefined);
+      if (!supported(claimed)) throw new Error('VERSION_UNSUPPORTED');
+      this.context = claimed;
       const credential = await this.db!.get<Credential>('credentials', this.context.sessionId);
       if (credential) await this.db!.put('credentials', { ...credential, bridgeId: this.bridgeId ?? undefined });
       this.launchBound = true;
@@ -176,10 +179,11 @@ export class App {
     this.maintenanceBusy = true;
     try {
       if (navigator.onLine) await this.session.reconcileClaims().catch(() => undefined);
+      if (navigator.onLine) await retryPendingExternal(this.session.api).catch(() => 0);
       await this.session.recoverStarted();
       const credentials = await this.db.all<Credential>('credentials');
       if (!this.publicEntry && !this.context && uuidV4.safeParse(this.bridgeId).success) {
-        this.context = credentials.find(c => c.phase === 'READY' && c.bridgeId === this.bridgeId && c.context?.capabilities.canStart)?.context;
+        this.context = credentials.find(c => c.phase === 'READY' && c.bridgeId === this.bridgeId && c.context?.capabilities.canStart && supported(c.context))?.context as SessionContext | undefined;
         if (this.context) this.launchBound = true;
         if (this.context && this.screen === 'finish' && !this.engine && this.context.sessionId !== this.lastOut?.sessionId) {
           this.screen = 'instructions'; this.lastOut = undefined; this.deliveryState = 'PENDING'; this.render();
@@ -211,7 +215,30 @@ export class App {
       if (this.screen === 'instructions') { this.status = 'La recuperación necesita conexión o ayuda de tu profesor.'; this.refreshAvailability(); }
     } finally { this.maintenanceBusy = false; }
   }
+  // Juegos TG-02 a TG-04: corren en un marco del mismo origen y su registro se envía con el contrato ext-1.
+  private async runExternal(context: ExternalContext): Promise<void> {
+    const credential = await this.db!.get<Credential>('credentials', context.sessionId);
+    if (!credential) throw new Error('CREDENTIAL_MISSING');
+    const title = EXTERNAL_GAMES[context.taskId].title;
+    this.externalActive = true; this.screen = 'running';
+    const host = el('section', 'external-host'); host.setAttribute('aria-label', title);
+    this.main.replaceChildren(host);
+    let message: string;
+    try {
+      const result = await runExternal(this.session!.api, context, credential.runtimeSecret, host);
+      message = result.delivered ? '¡Muy bien! Tu actividad quedó guardada. Ya puedes cerrar esta ventana.'
+        : 'Terminaste. Guardamos tu actividad en este navegador y la enviaremos cuando haya conexión. No borres los datos del sitio.';
+    } catch {
+      message = 'No pudimos iniciar la actividad. Comprueba la conexión y pide ayuda a tu profesor.';
+    }
+    this.externalActive = false; this.screen = 'access';
+    this.main.replaceChildren();
+    const done = el('section', 'access-sheet');
+    done.append(el('h1', '', title), el('p', 'intro-copy', message), this.publicLink('/', 'Ingresar otro código'));
+    this.main.append(done); this.say(message);
+  }
   private render(focus = false): void {
+    if (this.externalActive) return;
     for (const timer of this.exampleTimers) clearTimeout(timer);
     this.exampleTimers = [];
     this.main.replaceChildren(); this.startButton = undefined; this.reasonNode = undefined;
@@ -252,6 +279,7 @@ export class App {
       this.claiming = true; submit.disabled = true; feedback.textContent = 'Comprobando el código…';
       void this.session.claimCode(value, recovery ? { sessionId: recovery.sessionId, submissionId: recovery.envelope.submissionId } : undefined).then(async context => {
         clear();
+        if (isExternal(context) && !recovery) { await this.runExternal(context); return; }
         if (!supported(context)) throw new Error('VERSION_UNSUPPORTED');
         if (recovery) {
           this.context = undefined; this.lastOut = undefined;

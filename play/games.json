@@ -1,0 +1,8 @@
+{
+  "_comentario": "Juegos que Kudlab Play descarga al compilar desde los repositorios de Alexander Niño. ref = rama o commit; fijar un commit para una entrega.",
+  "games": [
+    { "taskId": "TG-02", "slug": "tg-02", "title": "Palabra intrusa", "repo": "https://github.com/AlexanderNino97/TD-PALABRA-INTRUSA.git", "ref": "main" },
+    { "taskId": "TG-03", "slug": "tg-03", "title": "Mentalista", "repo": "https://github.com/AlexanderNino97/TD-MENTALISTA.git", "ref": "main" },
+    { "taskId": "TG-04", "slug": "tg-04", "title": "Kud Dice", "repo": "https://github.com/AlexanderNino97/TD-KUD-DICE.git", "ref": "main" }
+  ]
+}

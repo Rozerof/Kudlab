@@ -47,7 +47,7 @@ describe('indicatorHistoryQuerySchema', () => {
     expect(parsed.limit).toBe(50);
   });
   it('rechaza parámetros desconocidos, límite fuera de 1–100, fechas mal formadas y tarea ajena', () => {
-    for (const bad of [{ extra: '1' }, { limit: '0' }, { limit: '101' }, { limit: 'x' }, { from: '2026-3-1' }, { taskId: 'TG-02' }, { metricCode: 'x' }])
+    for (const bad of [{ extra: '1' }, { limit: '0' }, { limit: '101' }, { limit: 'x' }, { from: '2026-3-1' }, { taskId: 'TG-09' }, { metricCode: 'x' }])
       expect(indicatorHistoryQuerySchema.safeParse(bad).success).toBe(false);
   });
 });

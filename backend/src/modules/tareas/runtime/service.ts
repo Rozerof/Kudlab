@@ -6,12 +6,13 @@ import { students, groups } from '../../../db/schema/academic.js';
 import { userAccounts } from '../../../db/schema/accounts.js';
 import { user } from '../../../db/schema/auth.js';
 import { tasks, taskPublishedVersions } from '../../../db/schema/tasks.js';
-import { assignments, recipients, operationReceipts, gameSessions, runtimeCapabilities, launchGrants, resultReceipts, rawEvents, sessionIncidents, gameConfigurations, indicatorRules, calculationRuns, calculatedIndicators } from '../../../db/schema/game.js';
+import { assignments, recipients, operationReceipts, gameSessions, runtimeCapabilities, launchGrants, resultReceipts, rawEvents, sessionIncidents, gameConfigurations, indicatorRules, calculationRuns, calculatedIndicators, externalResults } from '../../../db/schema/game.js';
 import { withAcademicAccess, type AcademicActor, type AcademicTransaction as Tx } from '../../academico/shared/academic-auth.js';
 import { participationProvider, requireParticipation, syntheticEnabled, type GameDependencies } from '../../academico/shared/participation.js';
 import { hasActiveIdentity } from '../../usuarios/shared/accounts.types.js';
 import { notFound } from '../../academico/shared/academic.errors.js';
-import { compatible, envelopeSchema, hash, secretDigest, uuid, uuidV4, secret, type Envelope } from './contract.js';
+import { EXTERNAL_RULES, isExternalTask } from '../../evolucion/external.js';
+import { compatible, envelopeSchema, externalEnvelopeSchema, hash, secretDigest, uuid, uuidV4, secret, type Envelope } from './contract.js';
 import { GameError, conflict } from './errors.js';
 import { cursorFor, cursorPosition, decryptGrant, encryptGrant, runtimeSettings } from './security.js';
 import { RULE } from '../../evolucion/tg01.js';
@@ -49,7 +50,7 @@ export function createGameService(deps: GameDependencies = {}) {
     await requireStartedAuthorization(tx, s);
   }
   const methodAllowed = (rule: typeof indicatorRules.$inferSelect) => hash(rule.definition) === rule.definitionHash &&
-    hash(rule.definition) === hash(RULE) && (rule.approvalStatus === 'APPROVED' || syntheticEnabled(deps));
+    hash(rule.definition) === hash(isExternalTask(rule.taskId) ? EXTERNAL_RULES[rule.taskId] : RULE) && (rule.approvalStatus === 'APPROVED' || syntheticEnabled(deps));
   async function ownGroup(tx: Tx, actor: AcademicActor, id: string) {
     resourceId(id);
     const [group] = await tx.select().from(groups).where(and(eq(groups.id, id), eq(groups.teacherId, actor.accountId))).for('share');
@@ -149,6 +150,34 @@ export function createGameService(deps: GameDependencies = {}) {
     }
     return { ...await assignmentSummary(tx, a, rows.length, now), recipients: detail };
   }
+  // Entrega de los juegos externos (TG-02 a TG-04): mismas reglas de sesión, capacidad, versión e idempotencia que TG-01.
+  async function submitExternal(id: string, token: string, payload: unknown) {
+    const e = externalEnvelopeSchema.parse(payload);
+    return authenticated(id, token, async (tx, s, cap) => {
+      const fingerprint = hash(e);
+      if (e.sessionId !== id) throw new GameError(409, 'VERSION_UNSUPPORTED');
+      if (cap.submissionId && cap.submissionId !== e.submissionId) throw new GameError(409, 'RESULT_CONFLICT');
+      const [old] = await tx.select().from(resultReceipts).where(eq(resultReceipts.sessionId, id));
+      if (old) {
+        if (old.submissionId !== e.submissionId) throw new GameError(409, 'SESSION_ALREADY_SUBMITTED');
+        if (old.evidenceHash !== fingerprint) throw new GameError(409, 'RESULT_CONFLICT');
+        return { repeated: true, receipt: receiptDto(old) };
+      }
+      if (!s.startedAtServer || !s.attemptNumber) throw new GameError(409, 'SESSION_NOT_STARTED');
+      if (!cap.canSubmit) throw new GameError(401, 'RUNTIME_UNAUTHENTICATED');
+      await requireStartedAuthorization(tx, s);
+      const { c } = await sessionConfig(tx, s);
+      if (e.publishedVersionId !== c.version.id || e.configVersion !== c.version.version || e.contractVersion !== c.config.contractVersion || e.gameBuildId !== c.config.gameBuildId || e.configurationHash !== c.config.configurationHash || e.taskId !== s.taskId) throw new GameError(409, 'VERSION_UNSUPPORTED');
+      const [global] = await tx.select().from(resultReceipts).where(eq(resultReceipts.submissionId, e.submissionId));
+      if (global) throw new GameError(409, 'RESULT_CONFLICT');
+      const [receipt] = await tx.insert(resultReceipts).values({ sessionId: id, submissionId: e.submissionId, contractVersion: e.contractVersion, evidenceHash: fingerprint,
+        producerState: e.state, terminationReason: e.terminationReason, clockId: e.clock.id, timeOriginUnixMs: e.clock.timeOriginUnixMs, ...e.timing, device: e.device }).returning();
+      await tx.insert(externalResults).values({ sessionId: id, taskId: e.taskId, payload: e.payload, eventCount: e.payload.events.length });
+      await tx.insert(calculationRuns).values({ sessionId: id, ruleVersionId: c.rule.id, runNumber: 1, evidenceHash: fingerprint });
+      await tx.update(gameSessions).set({ executionStatus: e.state === 'completed' ? 'COMPLETED' : 'INTERRUPTED', processingStatus: 'PENDING', closedReceivedAt: receipt!.receivedAt }).where(eq(gameSessions.id, id));
+      return { repeated: false, receipt: receiptDto(receipt!) };
+    });
+  }
   const receiptDto = (r: typeof resultReceipts.$inferSelect) => ({ receiptId: r.id, sessionId: r.sessionId, submissionId: r.submissionId, receivedAt: r.receivedAt.toISOString(), evidenceHash: r.evidenceHash, processingStatusAtReceipt: 'PENDING' as const });
   async function sessionConfig(tx: Tx, s: SessionRow) {
     const r = await recipient(tx, s.recipientId);
@@ -157,7 +186,9 @@ export function createGameService(deps: GameDependencies = {}) {
   }
   async function sessionSummary(tx: Tx, s: SessionRow) {
     const { a, c } = await sessionConfig(tx, s);
-    const [counts] = await tx.select({ n: sql<number>`count(*)::int` }).from(rawEvents).where(eq(rawEvents.sessionId, s.id));
+    const [raw] = await tx.select({ n: sql<number>`count(*)::int` }).from(rawEvents).where(eq(rawEvents.sessionId, s.id));
+    const [ext] = await tx.select({ n: externalResults.eventCount }).from(externalResults).where(eq(externalResults.sessionId, s.id));
+    const counts = { n: raw!.n + (ext?.n ?? 0) };
     const [incidents] = await tx.select({ n: sql<number>`count(*)::int` }).from(sessionIncidents).where(eq(sessionIncidents.sessionId, s.id));
     const now = Date.now();
     const executionStatus = s.executionStatus === 'READY' && s.startAllowedUntil.getTime() <= now ? 'EXPIRED' : s.executionStatus === 'RUNNING' && s.startedAtServer!.getTime() + 1920000 <= now ? 'UNCONFIRMED' : s.executionStatus;
@@ -218,7 +249,7 @@ export function createGameService(deps: GameDependencies = {}) {
     const configured = await ready(tx, a, now);
     const existing = await tx.select().from(gameSessions).where(and(eq(gameSessions.studentId, r.studentId), eq(gameSessions.taskId, a.taskId), inArray(gameSessions.executionStatus, ['READY', 'RUNNING'])));
     if (existing[0]?.executionStatus === 'RUNNING' || existing[0] && (code || existing[0].launchMode === 'CODE' || existing[0].recipientId !== r.id)) throw conflict('ACTIVE_SESSION');
-    if (!existing[0] && configured.config.contractVersion !== '1.1') throw conflict('CONFIGURATION_UNSUPPORTED');
+    if (!existing[0] && !['1.1', 'ext-1'].includes(configured.config.contractVersion)) throw conflict('CONFIGURATION_UNSUPPORTED');
     const [count] = await tx.select({ n: sql<number>`count(*)::int` }).from(gameSessions).where(and(eq(gameSessions.recipientId, r.id), sql`${gameSessions.attemptNumber} is not null`));
     if (count!.n >= a.maxAttempts) throw conflict('ATTEMPT_LIMIT');
     const until = new Date(Math.min((existing[0]?.preparedAt ?? now).getTime() + 900000, a.endsAt.getTime(), validUntil?.getTime() ?? Infinity, code?.expiresAt.getTime() ?? Infinity));
@@ -416,7 +447,7 @@ export function createGameService(deps: GameDependencies = {}) {
         await ownGroup(tx, actor, input.groupId);
         const op = await operation(tx, actor, input, 'CREATE_ASSIGNMENT', input.groupId, content, async () => {
           const c = await configuration(tx, input.publishedVersionId);
-          if (c.config.contractVersion !== '1.1') throw conflict('CONFIGURATION_UNSUPPORTED');
+          if (!['1.1', 'ext-1'].includes(c.config.contractVersion)) throw conflict('CONFIGURATION_UNSUPPORTED');
           if (c.task.id !== input.taskId || !c.task.isEnabled || !methodAllowed(c.rule)) throw conflict('TASK_UNAVAILABLE');
           for (const id of [...input.studentIds].sort()) { await lockStudent(tx, id); const s = await ownStudent(tx, actor, id); if (s.groupId !== input.groupId) throw notFound(); await requireParticipation(participation, tx, id, new Date()); }
           const [a] = await tx.insert(assignments).values({ ...content, studentIds: undefined, createdBy: actor.accountId, startsAt: new Date(input.startsAt), endsAt: new Date(input.endsAt), requestId, requestHash: hash(content) } as typeof assignments.$inferInsert).returning();
@@ -574,6 +605,7 @@ export function createGameService(deps: GameDependencies = {}) {
       });
     },
     async submit(id: string, token: string, payload: unknown) {
+      if (payload && typeof payload === 'object' && (payload as { contractVersion?: unknown }).contractVersion === 'ext-1') return submitExternal(id, token, payload);
       const e = envelopeSchema.parse(payload);
       return authenticated(id, token, async (tx, s, cap) => {
         const fingerprint = hash(e);

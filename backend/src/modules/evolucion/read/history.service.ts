@@ -3,14 +3,15 @@ import { assignments, calculatedIndicators, calculationRuns, gameConfigurations,
 import { groups } from '../../../db/schema/academic.js';
 import { taskPublishedVersions } from '../../../db/schema/tasks.js';
 import type { AcademicTransaction } from '../../academico/shared/academic-auth.js';
-import { INDICATOR_METRIC_CODES, INDICATOR_SCOPES, type IndicatorMetricCode, type IndicatorScope } from './definitions.js';
+import { INDICATOR_METRIC_CODES, INDICATOR_SCOPES, type IndicatorMetricCode, type IndicatorScope, type IndicatorTaskId } from './definitions.js';
+import { externalResults } from '../../../db/schema/game.js';
 import type { IndicatorHistorySession, IndicatorValueDto } from './dto.js';
 import { approvalAtCalculation, normalizeExecutionStatus } from './run-state.js';
 
 export type { IndicatorMetricCode, IndicatorScope } from './definitions.js';
 export type SessionResultsScope = { kind: 'student-history' } | { kind: 'course'; groupId: string };
 // `startedFrom` inclusivo y `startedBefore` exclusivo: instantes, nunca fechas de calendario (ver dates.ts).
-export type SessionResultsFilter = { taskId?: 'TG-01'; startedFrom?: Date; startedBefore?: Date; metricCodes?: readonly IndicatorMetricCode[]; scopes?: readonly IndicatorScope[] };
+export type SessionResultsFilter = { taskId?: IndicatorTaskId; startedFrom?: Date; startedBefore?: Date; metricCodes?: readonly IndicatorMetricCode[]; scopes?: readonly IndicatorScope[] };
 export type SessionResultsInput = { studentIds: readonly string[]; scope: SessionResultsScope; filter?: SessionResultsFilter;
   // Opcional (ampliación compatible de COORD-02 r2): sin él, `detailAccess` es siempre UNAVAILABLE. Solo la lectura HTTP lo usa.
   viewerAccountId?: string };
@@ -48,13 +49,14 @@ async function readSessions(tx: AcademicTransaction, input: SessionResultsInput,
     const batch = rows.slice(i, i + BATCH), sessionIds = batch.map(r => r.s.id), runIds = batch.flatMap(r => r.run ? [r.run.id] : []);
     const trials = await tx.select({ id: rawEvents.sessionId, n: sql<number>`count(*)::int` }).from(rawEvents).where(inArray(rawEvents.sessionId, sessionIds)).groupBy(rawEvents.sessionId);
     const incidents = await tx.select({ id: sessionIncidents.sessionId, n: sql<number>`count(*)::int` }).from(sessionIncidents).where(inArray(sessionIncidents.sessionId, sessionIds)).groupBy(sessionIncidents.sessionId);
-    for (const id of sessionIds) counts.set(id, { trials: trials.find(t => t.id === id)?.n ?? 0, incidents: incidents.find(t => t.id === id)?.n ?? 0 });
+    const ext = await tx.select({ id: externalResults.sessionId, n: externalResults.eventCount }).from(externalResults).where(inArray(externalResults.sessionId, sessionIds));
+    for (const id of sessionIds) counts.set(id, { trials: (trials.find(t => t.id === id)?.n ?? 0) + (ext.find(t => t.id === id)?.n ?? 0), incidents: incidents.find(t => t.id === id)?.n ?? 0 });
     if (runIds.length) {
       const values = await tx.select().from(calculatedIndicators).where(and(inArray(calculatedIndicators.runId, runIds),
         wantedMetrics ? inArray(calculatedIndicators.metricCode, [...wantedMetrics]) : undefined, wantedScopes ? inArray(calculatedIndicators.scope, [...wantedScopes]) : undefined));
       for (const v of values) {
         const list = byRun.get(v.runId) ?? []; byRun.set(v.runId, list);
-        list.push({ metricCode: v.metricCode as IndicatorMetricCode, scope: v.scope as IndicatorScope, status: v.status, value: v.value === null ? null : Number(v.value), unit: v.unit as '%' | 'ms',
+        list.push({ metricCode: v.metricCode as IndicatorMetricCode, scope: v.scope as IndicatorScope, status: v.status, value: v.value === null ? null : Number(v.value), unit: v.unit as IndicatorValueDto['unit'],
           numerator: v.numerator, denominator: v.denominator, sampleSize: v.sampleSize, unavailabilityReason: v.unavailabilityReason as IndicatorValueDto['unavailabilityReason'] });
       }
     }
@@ -64,7 +66,7 @@ async function readSessions(tx: AcademicTransaction, input: SessionResultsInput,
   const now = new Date();
   return rows.map(r => {
     const c = counts.get(r.s.id)!;
-    return { sessionId: r.s.id, taskId: 'TG-01' as const, attemptNumber: r.s.attemptNumber, occurredAt: r.s.startedAtServer!.toISOString(),
+    return { sessionId: r.s.id, taskId: r.s.taskId as IndicatorTaskId, attemptNumber: r.s.attemptNumber, occurredAt: r.s.startedAtServer!.toISOString(),
       executionStatus: normalizeExecutionStatus({ executionStatus: r.s.executionStatus, startAllowedUntil: r.s.startAllowedUntil, startedAtServer: r.s.startedAtServer }, now),
       processingStatus: r.s.processingStatus, configVersion: r.configVersion, publishedVersionId: r.publishedVersionId, incidentCount: c.incidents, recordedTrialCount: c.trials,
       rule: { code: r.rule.code, version: r.rule.version, approval: { current: r.rule.approvalStatus, approvedAt: r.rule.approvedAt?.toISOString() ?? null } },

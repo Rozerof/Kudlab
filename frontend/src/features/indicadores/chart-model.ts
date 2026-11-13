@@ -1,10 +1,11 @@
+import type { Unit } from './types.ts';
 import { conditionKey, conditionLabel, isInterrupted, missingReason, shortDate } from './format.ts';
 import type { HistorySession, MetricCode, Scope } from './types.ts';
 import { metricUnits } from './types.ts';
 
 export type Point = { sessionId: string; at: string; index: number; kind: 'value' | 'missing'; value: number | null; reason: string | null; shape: number; condition: string; interrupted: boolean };
 export type Condition = { key: string; shape: number; label: string };
-export type ChartModel = { metricCode: MetricCode; scope: Scope; unit: '%' | 'ms'; max: number; ticks: number[]; points: Point[]; conditions: Condition[]; xLabels: { index: number; text: string }[] };
+export type ChartModel = { metricCode: MetricCode; scope: Scope; unit: Unit; max: number; ticks: number[]; points: Point[]; conditions: Condition[]; xLabels: { index: number; text: string }[] };
 export type Placed = Point & { x: number; y: number };
 export const SHAPES = ['circle', 'square', 'diamond', 'triangle'] as const;
 

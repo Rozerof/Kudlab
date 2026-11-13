@@ -1,4 +1,4 @@
-import { BUILD_ID, VIEWPORT_BUILD_ID, contextSchema, type SessionContext } from '../contract/schema';
+import { BUILD_ID, VIEWPORT_BUILD_ID, contextSchema, type AnyContext, type SessionContext } from '../contract/schema';
 import { Engine } from './tg01/engine';
 function create(...args: ConstructorParameters<typeof Engine>): Engine {
   const config = structuredClone(args[0]);
@@ -11,6 +11,6 @@ export const registry = Object.freeze({
     create,
     destroy: (game: Engine) => game.finish('user_exit', game.at) }),
 });
-export function supported(context: SessionContext): boolean {
+export function supported(context: AnyContext): context is SessionContext {
   return contextSchema.safeParse(context).success;
 }

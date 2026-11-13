@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { createHash } from 'node:crypto';
+import { EXTERNAL_BUILDS, EXTERNAL_CONTRACT, EXTERNAL_PROFILES, EXTERNAL_TASK_IDS, isExternalTask } from '../../evolucion/external.js';
 
 export const uuid = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 export const uuidV4 = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
@@ -24,6 +25,10 @@ export const PROFILE: Config = {
   minimumStageScale: .6, inputProfile: 'POINTER_V1', layoutRule: 'VIEWPORT_FIT_V2', referenceWidthUnits: 480, minimumLaneWidthUnits: 120, maximumLanes: 6,
 };
 export function compatible(version: string, build: string, config: unknown) {
+  if (version === EXTERNAL_CONTRACT) {
+    const task = Object.entries(EXTERNAL_BUILDS).find(([, b]) => b === build)?.[0];
+    return !!task && isExternalTask(task) && hash(config) === hash(EXTERNAL_PROFILES[task]);
+  }
   return version === '1.1' && build === 'tg01-viewport-rebuild-2' && viewportConfigSchema.safeParse(config).success ||
     version === '1.0' && build === 'tg01-reference-rebuild-1' && legacyConfigSchema.safeParse(config).success;
 }
@@ -119,3 +124,23 @@ export function canonical(value: unknown): string {
 }
 export const hash = (value: unknown) => createHash('sha256').update(canonical(value)).digest('hex');
 export const secretDigest = (value: string) => createHash('sha256').update(Buffer.from(secret.parse(value), 'base64url')).digest('hex');
+
+// Contrato «ext-1» de los juegos TG-02 a TG-04: Kudlab Play los ejecuta en un marco aislado y entrega aquí
+// el registro completo que produce cada juego (payload), con la misma sesión, versión y huella de configuración.
+export const externalEnvelopeSchema = z.strictObject({
+  contractVersion: z.literal(EXTERNAL_CONTRACT), sessionId: uuid, submissionId: uuidV4, taskId: z.enum(EXTERNAL_TASK_IDS), publishedVersionId: uuid,
+  configVersion: z.number().int().positive(), configurationHash: z.string().regex(/^[a-f0-9]{64}$/), gameBuildId: z.string().min(1).max(64),
+  state: z.enum(['completed', 'interrupted']), terminationReason: z.enum(['time_limit', 'user_exit', 'visibility_lost', 'script_error', 'resource_error']),
+  clock: z.strictObject({ id: uuid, timeOriginUnixMs: time }),
+  timing: z.strictObject({ startedAtMs: time, finishedAtMs: time, lastCheckpointAtMs: time }),
+  device: legacyDevice,
+  payload: z.looseObject({ taskId: z.enum(EXTERNAL_TASK_IDS), events: z.array(z.unknown()).max(1000) }),
+}).superRefine((e, ctx) => {
+  const fail = (message: string) => ctx.addIssue({ code: 'custom', message });
+  const { startedAtMs: start, finishedAtMs: end, lastCheckpointAtMs: checkpoint } = e.timing;
+  if (start > end || end !== checkpoint || end - start > 1800000) fail('Incoherent timing');
+  if ((e.state === 'completed') !== (e.terminationReason === 'time_limit')) fail('Incoherent state');
+  if (e.payload.taskId !== e.taskId || e.gameBuildId !== EXTERNAL_BUILDS[e.taskId]) fail('Task mismatch');
+  if (JSON.stringify(e.payload).length > 1000000) fail('Payload too large');
+});
+export type ExternalEnvelope = z.infer<typeof externalEnvelopeSchema>;

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { INDICATOR_METRIC_CODES, INDICATOR_SCOPES, UNAVAILABILITY_REASONS } from './definitions.js';
+import { INDICATOR_METRIC_CODES, INDICATOR_SCOPES, INDICATOR_TASK_IDS, INDICATOR_UNITS, UNAVAILABILITY_REASONS } from './definitions.js';
 
 const datetime = z.iso.datetime();
 const count = z.number().int().nonnegative();
@@ -12,15 +12,15 @@ export const ruleRefSchema = z.strictObject({
 });
 
 export const indicatorDefinitionSchema = z.strictObject({
-  metricCode: z.enum(INDICATOR_METRIC_CODES), taskId: z.literal('TG-01'), label: z.string().min(1), description: z.string().min(1),
-  calculation: z.string().min(1), unit: z.enum(['%', 'ms']), scopes: z.array(z.enum(INDICATOR_SCOPES)).min(1), inputs: z.string().min(1),
+  metricCode: z.enum(INDICATOR_METRIC_CODES), taskId: z.enum(INDICATOR_TASK_IDS), label: z.string().min(1), description: z.string().min(1),
+  calculation: z.string().min(1), unit: z.enum(INDICATOR_UNITS), scopes: z.array(z.enum(INDICATOR_SCOPES)).min(1), inputs: z.string().min(1),
   unavailabilityReasons: z.array(z.enum(UNAVAILABILITY_REASONS)), exclusions: z.string().min(1), rule: ruleRefSchema.nullable(),
 });
 export const indicatorDefinitionsResponseSchema = z.strictObject({ items: z.array(indicatorDefinitionSchema) });
 
 export const indicatorValueSchema = z.strictObject({
   metricCode: z.enum(INDICATOR_METRIC_CODES), scope: z.enum(INDICATOR_SCOPES), status: z.enum(['CALCULATED', 'NOT_AVAILABLE']),
-  value: z.number().nullable(), unit: z.enum(['%', 'ms']), numerator: count.nullable(), denominator: count.nullable(), sampleSize: count,
+  value: z.number().nullable(), unit: z.enum(INDICATOR_UNITS), numerator: count.nullable(), denominator: count.nullable(), sampleSize: count,
   unavailabilityReason: z.enum(UNAVAILABILITY_REASONS).nullable(),
 }).superRefine((v, ctx) => {
   // Ausencia ≠ cero: un valor solo existe cuando está calculado, y todo no disponible lleva motivo.
@@ -29,7 +29,7 @@ export const indicatorValueSchema = z.strictObject({
 });
 
 export const indicatorHistorySessionSchema = z.strictObject({
-  sessionId: z.uuid(), taskId: z.literal('TG-01'), attemptNumber: z.number().int().min(1).max(10).nullable(), occurredAt: datetime,
+  sessionId: z.uuid(), taskId: z.enum(INDICATOR_TASK_IDS), attemptNumber: z.number().int().min(1).max(10).nullable(), occurredAt: datetime,
   executionStatus: z.enum(['READY', 'RUNNING', 'COMPLETED', 'INTERRUPTED', 'EXPIRED', 'UNCONFIRMED']),
   processingStatus: z.enum(['NOT_RECEIVED', 'PENDING', 'PROCESSING', 'COMPLETED', 'FAILED']),
   configVersion: z.number().int().positive(), publishedVersionId: z.uuid(), incidentCount: count, recordedTrialCount: count,
@@ -44,7 +44,7 @@ export const indicatorHistoryResponseSchema = z.strictObject({
 });
 
 export const indicatorHistoryQuerySchema = z.strictObject({
-  taskId: z.literal('TG-01').optional(), metricCode: z.enum(INDICATOR_METRIC_CODES).optional(), scope: z.enum(INDICATOR_SCOPES).optional(),
+  taskId: z.enum(INDICATOR_TASK_IDS).optional(), metricCode: z.enum(INDICATOR_METRIC_CODES).optional(), scope: z.enum(INDICATOR_SCOPES).optional(),
   from: day.optional(), to: day.optional(), cursor: z.string().min(1).max(512).optional(),
   limit: z.string().regex(/^\d{1,3}$/).transform(Number).pipe(z.number().int().min(1).max(100)).optional(),
 });

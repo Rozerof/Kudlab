@@ -120,7 +120,7 @@ export function createGameRoutes(deps: GameDependencies = {}) {
   teacher.get('/task-assignments/:id', async c => { empty(c); return c.json(await service.assignment(academicActor(c), c.req.param('id'))); });
   teacher.post('/task-assignments/:id/cancel', async c => { empty(c); return c.json(await service.cancel(academicActor(c), c.req.param('id'), await body(c, 4096))); });
   teacher.post('/task-assignment-recipients/:id/launch-grants', async c => { empty(c); const r = await service.grant(academicActor(c), c.req.param('id'), await body(c, 4096)); return c.json(r.detail, r.repeated ? 200 : 201); });
-  teacher.get('/students/:id/task-sessions', async c => { const q = query(c, z.strictObject({ ...pageSchema, taskId: z.literal('TG-01').optional() })); return c.json(await service.listSessions(academicActor(c), c.req.param('id'), q.taskId, q)); });
+  teacher.get('/students/:id/task-sessions', async c => { const q = query(c, z.strictObject({ ...pageSchema, taskId: z.enum(['TG-01', 'TG-02', 'TG-03', 'TG-04']).optional() })); return c.json(await service.listSessions(academicActor(c), c.req.param('id'), q.taskId, q)); });
   teacher.get('/students/:id/task-assignments', async c => { const q = query(c, z.strictObject(pageSchema)); return c.json(await service.listStudentAssignments(academicActor(c), c.req.param('id'), q)); });
   teacher.get('/task-sessions/:id', async c => { empty(c); return c.json(await service.session(academicActor(c), c.req.param('id'))); });
   teacher.get('/task-sessions/:id/evidence', async c => { const q = query(c, z.strictObject({ ...pageSchema, kind: z.enum(['trials', 'incidents']) })); return c.json(await service.evidence(academicActor(c), c.req.param('id'), q.kind, q)); });

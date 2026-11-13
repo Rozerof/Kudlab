@@ -1,3 +1,4 @@
+import type { Unit } from './types.ts';
 import { useId } from 'react';
 import { DEFAULT_LAYOUT as L, place, SHAPES, type ChartModel, type Placed } from './chart-model.ts';
 import { formatValue, longDate, metricLabel } from './format.ts';
@@ -13,11 +14,11 @@ function Marker({ shape, x, y, hollow }: { shape: number; x: number; y: number; 
     default: return <circle cx={x} cy={y} r={R} {...common} />;
   }
 }
-const pointText = (p: Placed, unit: '%' | 'ms') => `${longDate(p.at)}: ${p.kind === 'value' ? formatValue(p.value, unit) : `sin dato (${p.reason})`}. ${p.condition}${p.interrupted ? '. Sesión interrumpida: no comparable' : ''}`;
+const pointText = (p: Placed, unit: Unit) => `${longDate(p.at)}: ${p.kind === 'value' ? formatValue(p.value, unit) : `sin dato (${p.reason})`}. ${p.condition}${p.interrupted ? '. Sesión interrumpida: no comparable' : ''}`;
 
 // Un indicador y un alcance. Puntos aislados por sesión: sin líneas, flechas ni lectura de tendencia. El eje x es ordinal (el espaciado no mide tiempo).
 export function IndicatorChart({ model, studentName, range }: { model: ChartModel; studentName: string; range: string }) {
-  const id = useId(), placed = place(model), title = `${metricLabel(model.metricCode)} (${model.unit}) de ${studentName} · TG-01 · ${SCOPE_LABELS[model.scope]} · ${range}`;
+  const id = useId(), placed = place(model), title = `${metricLabel(model.metricCode)} (${model.unit}) de ${studentName} · ${SCOPE_LABELS[model.scope]} · ${range}`;
   const values = placed.filter(p => p.kind === 'value').length, missing = placed.length - values;
   const description = `${placed.length} sesiones mostradas, ordenadas de la más antigua a la más reciente. ${values} con valor y ${missing} sin dato. Los valores completos están en la tabla siguiente.`;
   return <figure className="grid gap-3">

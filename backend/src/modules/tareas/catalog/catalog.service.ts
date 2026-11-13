@@ -4,12 +4,13 @@ import { tasks, taskPublishedVersions } from '../../../db/schema/tasks.js';
 import { gameConfigurations, indicatorRules } from '../../../db/schema/game.js';
 import { compatible, hash } from '../runtime/contract.js';
 import { RULE } from '../../evolucion/tg01.js';
+import { EXTERNAL_RULES, EXTERNAL_TASK_IDS, isExternalTask } from '../../evolucion/external.js';
 import { participationProvider, syntheticEnabled, type GameDependencies } from '../../academico/shared/participation.js';
 import { z } from 'zod';
 import { withAcademicAccess, type AcademicActor } from '../../academico/shared/academic-auth.js';
 import { GameError } from '../runtime/errors.js';
 
-const catalogIds = ['TG-01'];
+const catalogIds = ['TG-01', ...EXTERNAL_TASK_IDS];
 export type UnavailableReason = 'INTEGRATION_PENDING' | 'CONFIGURATION_UNPUBLISHED' | 'TASK_DISABLED' | 'CONFIGURATION_UNSUPPORTED' | 'METHODOLOGY_PENDING';
 type PublishedVersion = { id: string; version: number } | null;
 
@@ -36,7 +37,7 @@ function summary({ task, publishedVersion, configuration, rule }: Awaited<Return
   const integrationReady = Boolean(configuration && compatible(configuration.contractVersion, configuration.gameBuildId, configuration.configuration) && hash(configuration.configuration) === configuration.configurationHash);
   const readiness = taskReadiness(task.isEnabled, integrationReady, publishedVersion);
   if (publishedVersion && !integrationReady) readiness.unavailableReasons.push('CONFIGURATION_UNSUPPORTED');
-  if (rule && (hash(rule.definition) !== hash(RULE) || hash(rule.definition) !== rule.definitionHash || rule.approvalStatus !== 'APPROVED' && !syntheticEnabled(deps))) readiness.unavailableReasons.push('METHODOLOGY_PENDING');
+  if (rule && (hash(rule.definition) !== hash(isExternalTask(task.id) ? EXTERNAL_RULES[task.id] : RULE) || hash(rule.definition) !== rule.definitionHash || rule.approvalStatus !== 'APPROVED' && !syntheticEnabled(deps))) readiness.unavailableReasons.push('METHODOLOGY_PENDING');
   return { id: task.id, title: task.title, description: task.description, isEnabled: task.isEnabled,
     integrationReady, publishedVersion, assignable: readiness.unavailableReasons.length === 0, unavailableReasons: readiness.unavailableReasons, revision: task.revision };
 }

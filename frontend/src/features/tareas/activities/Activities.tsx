@@ -1,3 +1,4 @@
+import { TASK_OPTIONS, type TaskId } from './types';
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,7 +61,8 @@ export function Assignments({ api, studentsApi, tasksApi, group, actorId }: { ap
   </div>;
 }
 function AssignmentForm({ api, studentsApi, tasksApi, group, actorId }: { api: ActivitiesApi; studentsApi: StudentsApi; tasksApi: TasksApi; group: Group; actorId: string }) {
-  const studentQuery = useQuery(signal => studentsApi.list(signal), group.id), taskQuery = useQuery(signal => tasksApi.detail('TG-01', signal), 'TG-01');
+  const [taskId, setTaskId] = useState<TaskId>('TG-01');
+  const studentQuery = useQuery(signal => studentsApi.list(signal), group.id), taskQuery = useQuery(signal => tasksApi.detail(taskId, signal), taskId);
   const [selected, setSelected] = useState<string[]>([]), [error, setError] = useState('');
   const key = `kudlab:j02:assignment:${actorId}:${group.id}`;
   const [frozen, setFrozen] = useState<AssignmentInput | undefined>(() => { try { const v = JSON.parse(sessionStorage.getItem(key) ?? 'null'); return v?.groupId === group.id && typeof v.requestId === 'string' ? v : undefined; } catch { return; } });
@@ -91,12 +93,13 @@ function AssignmentForm({ api, studentsApi, tasksApi, group, actorId }: { api: A
     event.preventDefault(); if (submitting.current || mutation.pending || frozen || !task?.publishedVersion) return;
     const values = new FormData(event.currentTarget), start = new Date(String(values.get('startsAt'))), end = new Date(String(values.get('endsAt'))), maxAttempts = Number(values.get('maxAttempts'));
     if (!selectedIds.length || !Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || start >= end || !Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 10) { setError('Selecciona estudiantes activos, un periodo válido y entre 1 y 10 intentos.'); return; }
-    const input: AssignmentInput = { requestId: crypto.randomUUID(), taskId: 'TG-01', publishedVersionId: task.publishedVersion.id, groupId: group.id, studentIds: selectedIds, startsAt: start.toISOString(), endsAt: end.toISOString(), maxAttempts };
+    const input: AssignmentInput = { requestId: crypto.randomUUID(), taskId, publishedVersionId: task.publishedVersion.id, groupId: group.id, studentIds: selectedIds, startsAt: start.toISOString(), endsAt: end.toISOString(), maxAttempts };
     submitting.current = true;
     try { sessionStorage.setItem(key, JSON.stringify(input)); } catch { submitting.current = false; setError('No podemos conservar la solicitud para reconciliarla. Habilita el almacenamiento de este sitio antes de guardar.'); return; }
     setError(''); setFrozen(input); void send(input);
   }
-  return <section className="staff-stack activity-form" aria-labelledby="assignment-form-title"><h2 id="assignment-form-title" className="staff-section-title">Asignar Lluvia de estrellas</h2>
+  return <section className="staff-stack activity-form" aria-labelledby="assignment-form-title"><h2 id="assignment-form-title" className="staff-section-title">Asignar una actividad digital</h2>
+    {!frozen && <div className="auth-field"><Label htmlFor="assignment-task">Actividad</Label><select id="assignment-task" className="staff-select" value={taskId} onChange={e => setTaskId(e.target.value as TaskId)}>{TASK_OPTIONS.map(t => <option key={t.id} value={t.id}>{t.id} · {t.title}</option>)}</select></div>}
     <p>Los destinatarios quedan fijados al guardar. El límite de intentos lo decide el profesor; no es un umbral científico.</p>
     {frozen ? <Notice title={created ? 'Asignación creada' : mutation.pending ? 'Creando asignación…' : 'Hay una creación por confirmar'}><p>{frozen.studentIds.length} destinatarios · {date(frozen.startsAt)} – {date(frozen.endsAt)} · {frozen.maxAttempts} intentos. Conservamos la misma solicitud, sin duplicar la asignación.</p><Button className="mt-4" disabled={mutation.pending} onClick={() => void send(frozen)}>{mutation.pending ? 'Creando asignación…' : created ? 'Continuar con los códigos' : 'Comprobar creación'}</Button></Notice> : !task || !students ? (!studentQuery.result || !taskQuery.result ? <Loading text="Preparando formulario" /> : <ActivityFailure retry={() => { studentQuery.reload(); taskQuery.reload(); }} />) : <form onSubmit={submit} className="auth-form">
       <p>{task.pedagogicalNotice}</p>{!task.assignable && <Notice title="Actividad no disponible"><ul>{task.unavailableReasons.map(r => <li key={r}>{r === 'METHODOLOGY_PENDING' ? 'Método pendiente de aprobación' : r === 'TASK_DISABLED' ? 'Tarea deshabilitada' : 'Configuración o integración pendiente'}</li>)}</ul></Notice>}

@@ -46,7 +46,7 @@ describe('lecturas HTTP de indicadores (T-B01/T-B02)', () => {
   });
   it('parámetros inválidos → 400 sin fields', async () => {
     const x = await setup();
-    for (const q of ['?x=1', '?from=2026-02-30', '?from=2026-04-02&to=2026-04-01', '?metricCode=iq', '?scope=SEGMENT_9', '?taskId=TG-02', '?limit=0', '?limit=101', '?limit=1&limit=2', '?cursor=zzz']) {
+    for (const q of ['?x=1', '?from=2026-02-30', '?from=2026-04-02&to=2026-04-01', '?metricCode=iq', '?scope=SEGMENT_9', '?taskId=TG-09', '?limit=0', '?limit=101', '?limit=1&limit=2', '?cursor=zzz']) {
       const r = await x.history(q); await assertResponse(contract, '/api/v1/students/{id}/indicator-history', 'get', r.clone()); expect(r.status, q).toBe(400); expect(await r.json()).toEqual({ code: 'INVALID_INPUT', message: 'Datos inválidos' });
     }
   });

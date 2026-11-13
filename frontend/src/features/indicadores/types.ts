@@ -1,21 +1,33 @@
 import { isId, object } from '../tareas/activities/types.ts';
 
-export const metricCodes = ['accuracy_pct', 'omission_rate_pct', 'commission_rate_pct', 'median_reaction_time_ms', 'rt_sd_ms', 'rt_cv_pct'] as const;
+export const metricCodes = ['accuracy_pct', 'omission_rate_pct', 'commission_rate_pct', 'median_reaction_time_ms', 'rt_sd_ms', 'rt_cv_pct', 'precision_pct', 'error_rate_pct', 'position_accuracy_pct', 'longest_correct_length', 'order_error_rate_pct', 'load_precision_change_pts'] as const;
+export const taskIds = ['TG-01', 'TG-02', 'TG-03', 'TG-04'] as const;
+export type TaskId = typeof taskIds[number];
+export type Unit = '%' | 'ms' | 'items' | 'pts';
+// Indicadores que calcula cada tarea (reglas TG0X-DESCRIPTIVE-1 del backend).
+export const taskMetrics: Record<TaskId, readonly MetricCodeBase[]> = {
+  'TG-01': ['accuracy_pct', 'omission_rate_pct', 'commission_rate_pct', 'median_reaction_time_ms', 'rt_sd_ms', 'rt_cv_pct'],
+  'TG-02': ['precision_pct', 'error_rate_pct', 'omission_rate_pct', 'median_reaction_time_ms', 'rt_cv_pct'],
+  'TG-03': ['precision_pct', 'error_rate_pct', 'omission_rate_pct', 'median_reaction_time_ms', 'rt_cv_pct', 'load_precision_change_pts'],
+  'TG-04': ['precision_pct', 'position_accuracy_pct', 'longest_correct_length', 'order_error_rate_pct', 'median_reaction_time_ms'],
+};
+type MetricCodeBase = typeof metricCodes[number];
+export const taskTitles: Record<TaskId, string> = { 'TG-01': 'Lluvia de estrellas', 'TG-02': 'Palabra intrusa', 'TG-03': 'Mentalista', 'TG-04': 'Kud Dice' };
 export const scopes = ['SESSION', 'SEGMENT_1', 'SEGMENT_2', 'SEGMENT_3'] as const;
-export const reasons = ['NO_VALID_TARGETS', 'NO_VALID_DISTRACTORS', 'NO_VALID_RT', 'INSUFFICIENT_RT_FOR_VARIABILITY', 'SEGMENT_NOT_REACHED', 'TECHNICAL_EXCLUSION', 'ZERO_MEAN_RT', 'METHOD_NOT_APPROVED'] as const;
+export const reasons = ['NO_VALID_TARGETS', 'NO_VALID_DISTRACTORS', 'NO_VALID_RT', 'INSUFFICIENT_RT_FOR_VARIABILITY', 'SEGMENT_NOT_REACHED', 'TECHNICAL_EXCLUSION', 'ZERO_MEAN_RT', 'METHOD_NOT_APPROVED', 'NO_VALID_TRIALS', 'INSUFFICIENT_RT', 'NO_CORRECT_TRIALS', 'INSUFFICIENT_LOAD_DATA'] as const;
 export type MetricCode = typeof metricCodes[number];
 export type Scope = typeof scopes[number];
 export type Reason = typeof reasons[number];
-export const metricUnits: Record<MetricCode, '%' | 'ms'> = { accuracy_pct: '%', omission_rate_pct: '%', commission_rate_pct: '%', median_reaction_time_ms: 'ms', rt_sd_ms: 'ms', rt_cv_pct: '%' };
+export const metricUnits: Record<MetricCode, Unit> = { precision_pct: '%', error_rate_pct: '%', position_accuracy_pct: '%', longest_correct_length: 'items', order_error_rate_pct: '%', load_precision_change_pts: 'pts', accuracy_pct: '%', omission_rate_pct: '%', commission_rate_pct: '%', median_reaction_time_ms: 'ms', rt_sd_ms: 'ms', rt_cv_pct: '%' };
 const executionStatuses = ['READY', 'RUNNING', 'COMPLETED', 'INTERRUPTED', 'EXPIRED', 'UNCONFIRMED'] as const;
 const processingStatuses = ['NOT_RECEIVED', 'PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'] as const;
 
 export type RuleRef = { code: string; version: number; approval: { current: 'PROPOSED' | 'APPROVED'; approvedAt: string | null } };
-export type IndicatorDefinition = { metricCode: MetricCode; taskId: 'TG-01'; label: string; description: string; calculation: string; unit: '%' | 'ms';
+export type IndicatorDefinition = { metricCode: MetricCode; taskId: TaskId; label: string; description: string; calculation: string; unit: Unit;
   scopes: Scope[]; inputs: string; unavailabilityReasons: Reason[]; exclusions: string; rule: RuleRef | null };
-export type HistoryIndicator = { metricCode: MetricCode; scope: Scope; status: 'CALCULATED' | 'NOT_AVAILABLE'; value: number | null; unit: '%' | 'ms';
+export type HistoryIndicator = { metricCode: MetricCode; scope: Scope; status: 'CALCULATED' | 'NOT_AVAILABLE'; value: number | null; unit: Unit;
   numerator: number | null; denominator: number | null; sampleSize: number; unavailabilityReason: Reason | null };
-export type HistorySession = { sessionId: string; taskId: 'TG-01'; attemptNumber: number | null; occurredAt: string; executionStatus: typeof executionStatuses[number];
+export type HistorySession = { sessionId: string; taskId: TaskId; attemptNumber: number | null; occurredAt: string; executionStatus: typeof executionStatuses[number];
   processingStatus: typeof processingStatuses[number]; configVersion: number; publishedVersionId: string; incidentCount: number; recordedTrialCount: number;
   rule: RuleRef | null; approvalAtCalculation: 'APPROVED' | 'NOT_ESTABLISHED' | null; calculation: { runId: string; calculatedAt: string | null } | null;
   indicators: HistoryIndicator[]; detailAccess: 'AVAILABLE' | 'UNAVAILABLE' };
@@ -38,7 +50,7 @@ export function parseDefinitions(value: unknown): IndicatorDefinition[] | undefi
   const items: IndicatorDefinition[] = [];
   for (const raw of value.items) {
     if (!object(raw) || !exact(raw, ['metricCode', 'taskId', 'label', 'description', 'calculation', 'unit', 'scopes', 'inputs', 'unavailabilityReasons', 'exclusions', 'rule'])) return;
-    if (!has(metricCodes, raw.metricCode) || raw.taskId !== 'TG-01' || raw.unit !== metricUnits[raw.metricCode]) return;
+    if (!has(metricCodes, raw.metricCode) || !has(taskIds, raw.taskId) || raw.unit !== metricUnits[raw.metricCode]) return;
     for (const k of ['label', 'description', 'calculation', 'inputs', 'exclusions'] as const) if (typeof raw[k] !== 'string' || !raw[k]) return;
     if (!Array.isArray(raw.scopes) || !raw.scopes.length || !raw.scopes.every(s => has(scopes, s)) || !Array.isArray(raw.unavailabilityReasons) || !raw.unavailabilityReasons.every(r => has(reasons, r))) return;
     const rule = raw.rule === null ? null : parseRule(raw.rule);
@@ -62,7 +74,7 @@ function parseIndicator(v: unknown): HistoryIndicator | undefined {
 export function parseHistorySession(v: unknown): HistorySession | undefined {
   if (!object(v) || !exact(v, ['sessionId', 'taskId', 'attemptNumber', 'occurredAt', 'executionStatus', 'processingStatus', 'configVersion', 'publishedVersionId', 'incidentCount',
     'recordedTrialCount', 'rule', 'approvalAtCalculation', 'calculation', 'indicators', 'detailAccess'])) return;
-  if (!isId(v.sessionId) || v.taskId !== 'TG-01' || !(v.attemptNumber === null || Number.isInteger(v.attemptNumber)) || !instant(v.occurredAt)) return;
+  if (!isId(v.sessionId) || !has(taskIds, v.taskId) || !(v.attemptNumber === null || Number.isInteger(v.attemptNumber)) || !instant(v.occurredAt)) return;
   if (!has(executionStatuses, v.executionStatus) || !has(processingStatuses, v.processingStatus) || !Number.isInteger(v.configVersion) || !isId(v.publishedVersionId)) return;
   if (!count(v.incidentCount) || !count(v.recordedTrialCount) || !has(['AVAILABLE', 'UNAVAILABLE'] as const, v.detailAccess)) return;
   if (!(v.approvalAtCalculation === null || has(['APPROVED', 'NOT_ESTABLISHED'] as const, v.approvalAtCalculation))) return;

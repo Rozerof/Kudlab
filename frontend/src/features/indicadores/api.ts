@@ -1,9 +1,10 @@
+import type { TaskId } from './types.ts';
 import type { HttpClient } from '../../lib/http.ts';
 import type { HttpResult } from '../usuarios/types.ts';
 import { isId } from '../tareas/activities/types.ts';
 import { metricCodes, parseDefinitions, parseHistoryPage, scopes, type HistoryPage, type IndicatorDefinition, type MetricCode, type Scope } from './types.ts';
 
-export type HistoryFilter = { metricCode?: MetricCode; scope?: Scope; from?: string; to?: string };
+export type HistoryFilter = { taskId?: TaskId; metricCode?: MetricCode; scope?: Scope; from?: string; to?: string };
 const invalid: HttpResult<never> = { kind: 'error', status: 400, code: 'INVALID_INPUT', uncertain: false };
 const notFound: HttpResult<never> = { kind: 'error', status: 404, code: 'NOT_FOUND', uncertain: false };
 
@@ -28,7 +29,7 @@ export function createIndicatorsApi(http: HttpClient) {
     history(studentId: string, filter: HistoryFilter, signal: AbortSignal, cursor?: string): Promise<HttpResult<HistoryPage>> {
       if (!isId(studentId)) return Promise.resolve(notFound);
       if (filterError(filter)) return Promise.resolve(invalid);
-      const query = new URLSearchParams({ taskId: 'TG-01', limit: '25' });
+      const query = new URLSearchParams({ taskId: filter.taskId ?? 'TG-01', limit: '25' });
       for (const k of ['metricCode', 'scope', 'from', 'to'] as const) if (filter[k] !== undefined) query.set(k, filter[k]);
       if (cursor) query.set('cursor', cursor);
       return http.request(`/api/v1/students/${encodeURIComponent(studentId)}/indicator-history?${query}`, { signal, decode: v => parseHistoryPage(v, studentId) });

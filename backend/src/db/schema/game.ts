@@ -106,3 +106,8 @@ export const calculatedIndicators = pgTable('calculated_indicators', {
   metricCode: text('metric_code').notNull(), scope: text('scope').notNull(), status: text('availability_status', { enum: ['CALCULATED', 'NOT_AVAILABLE'] }).notNull(),
   value: numeric('value', { precision: 20, scale: 6 }), unit: text('unit').notNull(), numerator: integer('numerator'), denominator: integer('denominator'), sampleSize: integer('sample_size').notNull(), unavailabilityReason: text('unavailability_reason'),
 }, t => [unique().on(t.runId, t.metricCode, t.scope), check('indicator_availability_check', sql`(${t.status} = 'CALCULATED' and ${t.value} is not null and ${t.unavailabilityReason} is null) or (${t.status} = 'NOT_AVAILABLE' and ${t.value} is null and ${t.unavailabilityReason} is not null)`)]);
+// Registro completo entregado por los juegos externos (TG-02 a TG-04, contrato ext-1). Inmutable: una fila por sesión.
+export const externalResults = pgTable('external_game_results', {
+  sessionId: uuid('session_id').primaryKey().references(() => gameSessions.id), taskId: text('task_id').notNull().references(() => tasks.id),
+  payload: jsonb('payload').notNull(), eventCount: integer('event_count').notNull(), receivedAt: at('received_at').notNull().defaultNow(),
+}, t => [check('external_result_events_check', sql`${t.eventCount} >= 0 and ${t.eventCount} <= 1000`)]);

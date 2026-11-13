@@ -2,7 +2,7 @@ import type { HttpClient } from '../../../lib/http.ts';
 import { isId, object, parseAssignment, parseAssignmentSummary, parseStudentAssignment, parseGrant, parsePage, parseSession, parseSessionSummary, parseCode, parseRevealedCode, parseTrial, parseIncident, type Evidence } from './types.ts';
 import type { HttpResult } from '../../usuarios/types.ts';
 
-export type AssignmentInput = { requestId: string; taskId: 'TG-01'; publishedVersionId: string; groupId: string; studentIds: string[]; startsAt: string; endsAt: string; maxAttempts: number };
+export type AssignmentInput = { requestId: string; taskId: 'TG-01' | 'TG-02' | 'TG-03' | 'TG-04'; publishedVersionId: string; groupId: string; studentIds: string[]; startsAt: string; endsAt: string; maxAttempts: number };
 export function createActivitiesApi(http: HttpClient) {
   const request = <T>(path: string, signal: AbortSignal, decode: (value: unknown) => T | undefined, body?: unknown): Promise<HttpResult<T>> => {
     const resourceId = path.split('?')[0]!.split('/')[4], groupId = new URLSearchParams(path.split('?')[1]).get('groupId');

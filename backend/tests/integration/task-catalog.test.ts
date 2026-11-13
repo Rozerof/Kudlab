@@ -66,7 +66,7 @@ describe('catálogo persistido y proyección autorizada', () => {
   it('ADMIN y TEACHER activos consultan solo TG-01 y DTO filtrado', async () => {
     const { teacher, admin } = await inviteTeacher();
     const [initial] = await db.select().from(tasks);
-    await db.insert(tasks).values({ ...initial!, id: 'TG-02', title: 'Fuera de alcance' });
+    await db.insert(tasks).values({ ...initial!, id: 'TG-09', title: 'Fuera de alcance' });
     for (const actor of [admin, teacher]) {
       const list = await request(base, 'GET', undefined, actor);
       expect(list.status).toBe(200);

@@ -3,11 +3,12 @@ export const processingLabels = { NOT_RECEIVED: 'Sin evidencia recibida', PENDIN
 export const unavailableLabels: Record<string, string> = {
   TASK_UNAVAILABLE: 'Tarea no disponible', OUTSIDE_WINDOW: 'Fuera del periodo de disponibilidad', ASSIGNMENT_CANCELLED: 'Asignación cancelada',
   PARTICIPATION_BLOCKED: 'Participación no autorizada', ATTEMPT_LIMIT: 'Límite de intentos alcanzado', ACTIVE_SESSION: 'Ya existe una actividad en ejecución', CONFIGURATION_UNSUPPORTED: 'Configuración incompatible',
+  NO_VALID_TRIALS: 'No hay ítems válidos', INSUFFICIENT_RT: 'Menos de cinco tiempos de respuesta válidos', NO_CORRECT_TRIALS: 'Ninguna secuencia correcta', INSUFFICIENT_LOAD_DATA: 'Pocos ítems por carga para comparar',
   NO_VALID_TARGETS: 'No hay objetivos válidos', NO_VALID_DISTRACTORS: 'No hay distractores válidos', NO_VALID_RT: 'No hay tiempos de respuesta válidos',
   INSUFFICIENT_RT_FOR_VARIABILITY: 'Se necesitan al menos dos respuestas válidas para describir la variabilidad', SEGMENT_NOT_REACHED: 'Segmento no alcanzado',
   TECHNICAL_EXCLUSION: 'Evidencia excluida por incidencia técnica', ZERO_MEAN_RT: 'La media de los tiempos es cero', METHOD_NOT_APPROVED: 'Método no aprobado',
 };
-export const metricLabels: Record<string, string> = { accuracy_pct: 'Precisión', omission_rate_pct: 'Omisión', commission_rate_pct: 'Comisión', median_reaction_time_ms: 'Mediana del tiempo de respuesta', rt_sd_ms: 'Desviación del tiempo de respuesta', rt_cv_pct: 'Variabilidad relativa del tiempo de respuesta' };
+export const metricLabels: Record<string, string> = { precision_pct: 'Precisión', error_rate_pct: 'Errores', position_accuracy_pct: 'Exactitud por posición', longest_correct_length: 'Secuencia más larga correcta', order_error_rate_pct: 'Errores de orden', load_precision_change_pts: 'Cambio de precisión por carga', accuracy_pct: 'Precisión', omission_rate_pct: 'Omisión', commission_rate_pct: 'Comisión', median_reaction_time_ms: 'Mediana del tiempo de respuesta', rt_sd_ms: 'Desviación del tiempo de respuesta', rt_cv_pct: 'Variabilidad relativa del tiempo de respuesta' };
 export type Page<T> = { items: T[]; nextCursor: string | null };
 export type AssignmentSummary = { id: string; taskId: string; title: string; publishedVersionId: string; configVersion: number; groupId: string; startsAt: string; endsAt: string; maxAttempts: number; status: 'OPEN' | 'CANCELLED'; availability: string; recipientCount: number; createdAt: string };
 export type StudentAssignment = AssignmentSummary & { studentId: string; recipientId: string; attemptsStarted: number };
@@ -16,7 +17,7 @@ export type Assignment = AssignmentSummary & { recipients: Recipient[] };
 export type Grant = { sessionId: string; grantId: string; launchGrant: string; expiresAt: string; runtimeOrigin: string };
 export type SessionSummary = { id: string; studentId: string; taskId: string; assignmentId: string; attemptNumber: number | null; launchMode: 'SUPERVISED' | 'CODE'; configVersion: number; gameBuildId: string;
   executionStatus: keyof typeof executionLabels; processingStatus: keyof typeof processingLabels; preparedAt: string; startedAtServer: string | null; receivedAt: string | null; incidentCount: number; recordedTrialCount: number };
-export type Indicator = { metricCode: string; scope: string; status: 'CALCULATED' | 'NOT_AVAILABLE'; value: number | null; unit: '%' | 'ms'; numerator: number | null; denominator: number | null; sampleSize: number; unavailabilityReason: string | null };
+export type Indicator = { metricCode: string; scope: string; status: 'CALCULATED' | 'NOT_AVAILABLE'; value: number | null; unit: '%' | 'ms' | 'items' | 'pts'; numerator: number | null; denominator: number | null; sampleSize: number; unavailabilityReason: string | null };
 export type SessionDetail = SessionSummary & { declaredState: 'completed' | 'interrupted' | null; terminationReason: string | null; measuredDurationMs: number | null;
   publishedVersionId: string; configurationHash: string; configuration: Record<string, unknown>; device: Record<string, unknown> | null;
   receipt: { submissionId: string; receivedAt: string; evidenceHash: string } | null;
@@ -84,7 +85,7 @@ function validDevice(v: unknown, adaptive: boolean) {
   return Object.keys(v).length === 6 && positive(v.stageWidthCss) && positive(v.stageHeightCss) && v.stageWidthCss >= 288 && v.stageHeightCss >= 240 && v.stageWidthCss <= v.viewportWidth && v.stageHeightCss <= v.viewportHeight && Math.abs(v.stageScale - Math.min(1, v.stageWidthCss / 480)) < 1e-9;
 }
 export function parseAssignmentSummary(v: unknown): AssignmentSummary | undefined {
-  if (!object(v) || !isId(v.id) || v.taskId !== 'TG-01' || !text(v.title) || !isId(v.publishedVersionId) || !count(v.configVersion) || !v.configVersion || !isId(v.groupId) ||
+  if (!object(v) || !isId(v.id) || !TASK_IDS.includes(v.taskId as TaskId) || !text(v.title) || !isId(v.publishedVersionId) || !count(v.configVersion) || !v.configVersion || !isId(v.groupId) ||
     !date(v.startsAt) || !date(v.endsAt) || !date(v.createdAt) || !count(v.maxAttempts) || v.maxAttempts < 1 || v.maxAttempts > 10 || !['OPEN', 'CANCELLED'].includes(String(v.status)) || !['FUTURE', 'CURRENT', 'EXPIRED', 'CANCELLED'].includes(String(v.availability)) || !count(v.recipientCount)) return;
   return v as AssignmentSummary;
 }
@@ -98,7 +99,7 @@ export function parseAssignment(v: unknown): Assignment | undefined {
   return v as Assignment;
 }
 export function parseSessionSummary(v: unknown): SessionSummary | undefined {
-  if (!object(v) || !isId(v.id) || !isId(v.studentId) || !isId(v.assignmentId) || v.taskId !== 'TG-01' || !['SUPERVISED', 'CODE'].includes(String(v.launchMode)) ||
+  if (!object(v) || !isId(v.id) || !isId(v.studentId) || !isId(v.assignmentId) || !TASK_IDS.includes(v.taskId as TaskId) || !['SUPERVISED', 'CODE'].includes(String(v.launchMode)) ||
     !Object.hasOwn(executionLabels, String(v.executionStatus)) || !Object.hasOwn(processingLabels, String(v.processingStatus)) ||
     !count(v.configVersion) || !v.configVersion || !text(v.gameBuildId) || !date(v.preparedAt) || v.startedAtServer !== null && !date(v.startedAtServer) ||
     v.receivedAt !== null && !date(v.receivedAt) || v.attemptNumber !== null && (!count(v.attemptNumber) || v.attemptNumber < 1 || v.attemptNumber > 10) || !count(v.incidentCount) || !count(v.recordedTrialCount)) return;
@@ -112,7 +113,7 @@ export function parseSession(v: unknown): SessionDetail | undefined {
   if (v.receipt !== null && (!object(v.receipt) || !isId(v.receipt.submissionId) || !date(v.receipt.receivedAt) || typeof v.receipt.evidenceHash !== 'string' || !/^[a-f0-9]{64}$/.test(v.receipt.evidenceHash))) return;
   const c = v.calculation;
   if (object(c) && object(c.summary) && Object.keys(c.summary).length && (!count(c.summary.observed) || !count(c.summary.included) || !count(c.summary.excluded) || c.summary.observed !== c.summary.included + c.summary.excluded)) return;
-  if (c !== null && (!object(c) || !isId(c.runId) || c.ruleCode !== 'TG01-DESCRIPTIVE-1' || !count(c.ruleVersion) || !['PENDING', 'PROCESSING', 'SUCCEEDED', 'FAILED'].includes(String(c.status)) || c.calculatedAt !== null && !date(c.calculatedAt) || !object(c.summary) || !Array.isArray(c.indicators) || !c.indicators.every(i => object(i) && Object.hasOwn(metricLabels, String(i.metricCode)) && ['SESSION', 'SEGMENT_1', 'SEGMENT_2', 'SEGMENT_3'].includes(String(i.scope)) && ['%', 'ms'].includes(String(i.unit)) && count(i.sampleSize) && numeric(i.numerator) && numeric(i.denominator) &&
+  if (c !== null && (!object(c) || !isId(c.runId) || !/^TG0[1-4]-DESCRIPTIVE-\d+$/.test(String(c.ruleCode)) || !count(c.ruleVersion) || !['PENDING', 'PROCESSING', 'SUCCEEDED', 'FAILED'].includes(String(c.status)) || c.calculatedAt !== null && !date(c.calculatedAt) || !object(c.summary) || !Array.isArray(c.indicators) || !c.indicators.every(i => object(i) && Object.hasOwn(metricLabels, String(i.metricCode)) && ['SESSION', 'SEGMENT_1', 'SEGMENT_2', 'SEGMENT_3'].includes(String(i.scope)) && ['%', 'ms', 'items', 'pts'].includes(String(i.unit)) && count(i.sampleSize) && numeric(i.numerator) && numeric(i.denominator) &&
     (i.status === 'CALCULATED' && typeof i.value === 'number' && Number.isFinite(i.value) && i.unavailabilityReason === null || i.status === 'NOT_AVAILABLE' && i.value === null && typeof i.unavailabilityReason === 'string' && Object.hasOwn(unavailableLabels, i.unavailabilityReason))))) return;
   return v as SessionDetail;
 }
@@ -145,3 +146,9 @@ export function accessMessage(value: RevealedCode, title: string, playOrigin: st
   const recovery = value.scope === 'SUBMIT_ONLY';
   return `${recovery ? 'Para enviar una actividad pendiente, no volver a jugar' : 'Tienes una actividad'}: ${title}.\nAbre ${playOrigin}${recovery ? '/pendientes' : '/'} e ingresa este código: ${value.code}.\nVigente hasta ${new Date(value.expiresAt).toLocaleString('es-CO', { timeZoneName: 'short' })}. No compartas el código.\nSi falta enviar, vuelve al mismo sitio y perfil del navegador donde realizaste la actividad.`;
 }
+
+export const TASK_IDS = ['TG-01', 'TG-02', 'TG-03', 'TG-04'] as const;
+export type TaskId = (typeof TASK_IDS)[number];
+export const TASK_OPTIONS: readonly { id: TaskId; title: string }[] = [
+  { id: 'TG-01', title: 'Lluvia de estrellas' }, { id: 'TG-02', title: 'Palabra intrusa' }, { id: 'TG-03', title: 'Mentalista' }, { id: 'TG-04', title: 'Kud Dice' },
+];
