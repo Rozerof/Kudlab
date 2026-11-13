@@ -91,7 +91,8 @@ function Content({ state, filters, studentName, groupId, studentId, more, retry,
 function Results({ items, nextCursor, filters, studentName, groupId, studentId, more, moreFailed, fetching, dimmed = false }: { items: HistoryState['items']; nextCursor: string | null; filters: Filters; studentName: string; groupId: string; studentId: string; more(): void; moreFailed: boolean; fetching: boolean; dimmed?: boolean }) {
   const rows = buildRows(items, filters.metric, filters.scope);
   return <div className={cn('grid gap-6', dimmed && 'opacity-80')}>
-    {filters.metric === 'all' ? <p className="rounded-lg border border-border p-4">Elige un indicador para ver su gráfico. La tabla muestra todos los indicadores del alcance elegido.</p>
+    {filters.metric === 'all'
+      ? <div className="grid gap-6 lg:grid-cols-2">{taskMetrics[filters.task].map(m => <div key={m} className="rounded-xl border border-border p-4"><IndicatorChart model={buildChart(items, m as MetricCode, filters.scope)} studentName={studentName} range={rangeText(filters)} /></div>)}</div>
       : <IndicatorChart model={buildChart(items, filters.metric, filters.scope)} studentName={studentName} range={rangeText(filters)} />}
     <div className="staff-table-region" role="region" aria-label="Historia de indicadores por sesión" tabIndex={0}>
       <Table><TableCaption>{items.length} {items.length === 1 ? 'sesión cargada' : 'sesiones cargadas'}, de la más reciente a la más antigua. Fechas en hora de Colombia.</TableCaption>
