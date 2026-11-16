@@ -32,8 +32,12 @@ import type { AnnotationsApi } from '../../seguimiento/annotations/api.ts';
 import type { NotesApi } from '../notes/api.ts';
 import type { ObservationsApi } from '../../seguimiento/observations/api.ts';
 import { observationMatrixPath } from '../../seguimiento/observations/navigation.ts';
+import type { AulaApi } from '../../aula/api.ts';
+import { ClassroomMode, PriorityLegend, PriorityStar, StudentPlayAccess, useAliases, usePriority } from '../../aula/Aula';
+import { ObservationPanel } from '../../aula/ObservationPanel';
 
 export const studentsPath = '/academico/estudiantes';
+const noAula = {} as AulaApi;
 export const detailPath = (id: string, groupId?: string) => groupId ? groupStudentPath(groupId, id) : `${studentsPath}/${encodeURIComponent(id)}`;
 function Link({ href, children, primary = false }: { href: string; children: ReactNode; primary?: boolean }) {
   return <a href={href} onClick={navigate} className={`${buttonVariants({ variant: primary ? 'default' : 'outline' })} max-w-full [overflow-wrap:anywhere] no-underline`}>{children}</a>;
@@ -59,24 +63,31 @@ function Facts({ student, group }: { student: Student; group?: Group }) {
   </dl>;
 }
 
-export function Students({ api, group, write, reviewed }: { api: StudentsApi; group?: Group; write?: StudentWrite; reviewed?: () => void }) {
+export function Students({ api, group, write, reviewed, aula }: { api: StudentsApi; group?: Group; write?: StudentWrite; reviewed?: () => void; aula?: AulaApi }) {
   const query = useQuery((signal) => api.list(signal), group?.id ?? 'students');
+  const course = aula && group ? { aula, groupId: group.id } : undefined;
+  const priorities = usePriority(aula ?? noAula, course?.groupId);
+  const aliases = useAliases(aula ?? noAula, course?.groupId);
   return <div className="staff-stack">
     {group && <CourseBack />}
     <header className="staff-heading"><div className="workspace-page-heading"><Heading>{group?.name ?? 'Estudiantes'}</Heading><p>{group ? `Estudiantes · Grado ${group.grade} · Año ${group.schoolYear}` : 'Consulta y actualiza los registros de tus grupos, incluidos los inactivos.'}</p></div>{group && <Link href={`${groupPath(group.id)}/estudiantes/nuevo`} primary>Registrar estudiante</Link>}</header>
     {group && <div className="staff-actions"><Link href={assignmentPath(group.id)}>Asignaciones de tareas digitales</Link><Link href={observationMatrixPath(group.id)}>Registrar observaciones</Link></div>}
+    {course && <Section title="Modo aula: apodos y juegos activos" open><ClassroomMode api={course.aula} groupId={course.groupId} /></Section>}
+    {course && <PriorityLegend />}
     {!group && <p className="availability-note">Para registrar estudiantes, selecciona primero un curso en <a href={groupsPath} onClick={navigate}>Mis cursos</a>.</p>}
     {!query.result ? <Loading text="Consultando estudiantes" /> : query.result.kind !== 'success' ? <Failure result={query.result} retry={query.reload} /> : !query.result.data.items.length ?
       <Notice title={group ? 'Este curso aún no tiene estudiantes' : 'No hay estudiantes en tus grupos'}><p>{group ? 'Registra el primer estudiante con el botón Registrar estudiante.' : 'Los estudiantes de tus cursos aparecerán aquí.'}</p></Notice> :
       <><p className="text-sm text-muted" role="status">{query.result.data.items.length} {query.result.data.items.length === 1 ? 'estudiante' : 'estudiantes'} {group ? 'en este curso' : 'en tus grupos'}</p><div className="staff-table-region accounts-table-view" role="region" aria-label="Listado de estudiantes, desplazable horizontalmente" tabIndex={0}>
-        <Table aria-label="Estudiantes de tus grupos" className="min-w-[38rem]"><TableHeader><TableRow><TableHead>Código</TableHead><TableHead>Seudónimo</TableHead><TableHead>Iniciales o referencia</TableHead><TableHead>Estado</TableHead><TableHead>Ficha</TableHead></TableRow></TableHeader>
+        <Table aria-label="Estudiantes de tus grupos" className="min-w-[38rem]"><TableHeader><TableRow><TableHead>Código</TableHead><TableHead>Seudónimo</TableHead><TableHead>Iniciales o referencia</TableHead><TableHead>Estado</TableHead>{course && <><TableHead>Apodo</TableHead><TableHead>Prioridad de revisión</TableHead></>}<TableHead>Ficha</TableHead></TableRow></TableHeader>
           <TableBody>{query.result.data.items.map((student) => <TableRow key={student.id}>
             <TableCell>{student.studentCode}</TableCell><TableCell>{student.firstName}</TableCell><TableCell>{student.lastName}</TableCell><TableCell className="whitespace-nowrap">{student.isActive ? 'Activo' : 'Inactivo'}</TableCell>
+            {course && <><TableCell className="font-semibold">{aliases.get(student.id) ?? <span className="text-sm text-muted font-normal">Sin apodo</span>}</TableCell><TableCell><PriorityStar priority={priorities.get(student.id)} /></TableCell></>}
             <TableCell><a href={detailPath(student.id, group?.id)} onClick={navigate} className="staff-link whitespace-nowrap" aria-label={`Ver ficha de ${student.firstName} ${student.lastName}, código ${student.studentCode}`}>Ver ficha</a></TableCell>
           </TableRow>)}</TableBody></Table>
       </div><ul className="accounts-list-view" aria-label="Estudiantes de tus grupos">{query.result.data.items.map((student) => <li key={student.id}>
         <h2 className="font-semibold [overflow-wrap:anywhere]">{student.firstName} {student.lastName}</h2>
-        <dl className="account-facts"><div><dt>Código</dt><dd>{student.studentCode}</dd></div><div><dt>Estado</dt><dd>{student.isActive ? 'Activo' : 'Inactivo'}</dd></div></dl>
+        <dl className="account-facts"><div><dt>Código</dt><dd>{student.studentCode}</dd></div><div><dt>Estado</dt><dd>{student.isActive ? 'Activo' : 'Inactivo'}</dd></div>{course && <div><dt>Apodo</dt><dd>{aliases.get(student.id) ?? 'Sin apodo'}</dd></div>}</dl>
+        {course && <PriorityStar priority={priorities.get(student.id)} />}
         <a href={detailPath(student.id, group?.id)} onClick={navigate} className="staff-link w-fit" aria-label={`Ver ficha de ${student.firstName} ${student.lastName}, código ${student.studentCode}`}>Ver ficha</a>
       </li>)}</ul></>}
     {group && query.result?.kind === 'success' && write?.phase === 'uncertain' && !write.id && write.groupId === group.id && <Notice title="Revisa el registro que intentaste crear"><p>Comprueba si el estudiante ya aparece en el listado antes de volver a registrar sus datos.</p><Button variant="outline" className="mt-4" onClick={reviewed}>Ya revisé los estudiantes del curso</Button></Notice>}
@@ -91,8 +102,8 @@ export function StudentRegistration() {
   </div>;
 }
 
-export function StudentDetail({ api, readApi, activities, consents, observations, notes, annotations, drafts, actorId, apiOrigin, studentId, write, reviewed, group }: {
-  api: StudentsApi; readApi: StudentsApi; activities: ActivitiesApi; consents: ConsentsApi; observations: ObservationsApi; notes: NotesApi; annotations: AnnotationsApi; drafts: StudentDraftHost;
+export function StudentDetail({ api, readApi, activities, consents, observations, notes, annotations, drafts, actorId, apiOrigin, studentId, write, reviewed, group, aula }: {
+  aula?: AulaApi; api: StudentsApi; readApi: StudentsApi; activities: ActivitiesApi; consents: ConsentsApi; observations: ObservationsApi; notes: NotesApi; annotations: AnnotationsApi; drafts: StudentDraftHost;
   actorId: string; apiOrigin: string; studentId: string; write?: StudentWrite; reviewed(): void; group?: Group;
 }) {
   const [student, setStudent] = useState<Student>();
@@ -170,6 +181,8 @@ export function StudentDetail({ api, readApi, activities, consents, observations
       {lease && <StudentConsent key={`${apiOrigin}:${actorId}:${student.id}:${student.groupId}`} api={consents} studentId={studentId} actorId={actorId} snapshot={snapshot} refresh={refresh} lease={lease} recheck={recheckSelection}
         onChange={change => { if (activeSequence === sequence.current && lease.valid() && change.studentId === studentId) query.reload(); }} />}
       </Section>
+      {aula && <Section title="Acceso a los juegos (apodo y figura)" hint={student.isActive ? undefined : 'Inactivo'}><StudentPlayAccess api={aula} student={student} /></Section>}
+      {aula && <Section title="Panel de observación (0 a 5)"><ObservationPanel api={aula} student={student} /></Section>}
       <Section title="Actividades digitales">
       <StudentAssignments key={student.id} api={activities} student={student} refresh={refresh} />
       </Section>

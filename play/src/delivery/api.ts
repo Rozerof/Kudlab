@@ -3,8 +3,13 @@ import { contextSchema, externalContextSchema, receiptSchema, secretSchema, star
 import { hash } from '../contract/canonical';
 import { normalizeCode } from '../runtime/access-code';
 
+const aulaGroupsSchema = z.object({ items: z.array(z.object({ id: uuid, name: z.string().max(200), grade: z.string().max(40) })).max(200) });
+export const aulaSessionSchema = z.object({ ticket: z.string().max(400).regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/), alias: z.string().max(20), participationAllowed: z.boolean(),
+  games: z.array(z.object({ taskId: z.enum(['TG-01', 'TG-02', 'TG-03', 'TG-04']), title: z.string().max(120), attemptsLeft: z.number().int().min(0), canPlay: z.boolean() })).max(10) });
+export type AulaGroup = z.infer<typeof aulaGroupsSchema>['items'][number];
+export type AulaSession = z.infer<typeof aulaSessionSchema>;
 export class ApiError extends Error {
-  constructor(readonly status: number, readonly code: string, readonly retryAfterMs = 0) { super(code); }
+  constructor(readonly status: number, readonly code: string, readonly retryAfterMs = 0, readonly reason?: string) { super(code); }
 }
 export class Api {
   private base: string;
@@ -26,8 +31,8 @@ export class Api {
       const retry = response.headers.get('Retry-After');
       const wait = retry ? (/^\d+$/.test(retry) ? Number(retry) * 1000 : Math.max(0, Date.parse(retry) - Date.now())) : 0;
       const error = await response.json().catch(() => null);
-      const code = z.object({ code: z.string().regex(/^[A-Z_]{1,64}$/) }).safeParse(error);
-      throw new ApiError(response.status, code.success ? code.data.code : 'HTTP_ERROR', Number.isFinite(wait) ? wait : 0);
+      const code = z.object({ code: z.string().regex(/^[A-Z_]{1,64}$/), reason: z.string().regex(/^[A-Z_]{1,64}$/).optional() }).safeParse(error);
+      throw new ApiError(response.status, code.success ? code.data.code : 'HTTP_ERROR', Number.isFinite(wait) ? wait : 0, code.success ? code.data.reason : undefined);
     }
     let text: string;
     try { text = await response.text(); } catch { throw new ApiError(0, 'NETWORK_UNCERTAIN'); }
@@ -48,6 +53,20 @@ export class Api {
     uuidV4.parse(claimId); secretSchema.parse(runtimeSecret);
     if (recovery) { uuid.parse(recovery.sessionId); uuidV4.parse(recovery.submissionId); }
     return this.verifiedContext(await this.call(recovery ? '/access/recover' : '/access/claim', undefined, JSON.stringify({ code: normalizeCode(code), claimId, runtimeSecret, ...recovery })));
+  }
+  // Modo aula: curso con clase abierta → apodo + figura secreta → juegos activos → código de un juego.
+  async aulaGroups() {
+    return aulaGroupsSchema.parse(await this.call('/access/aula/groups', undefined)).items;
+  }
+  async aulaIdentify(groupId: string, alias: string, figure: number) {
+    uuid.parse(groupId);
+    return aulaSessionSchema.parse(await this.call('/access/aula/identify', undefined, JSON.stringify({ groupId, alias, figure })));
+  }
+  async aulaGames(ticket: string) {
+    return aulaSessionSchema.omit({ ticket: true }).parse(await this.call('/access/aula/games', undefined, JSON.stringify({ ticket })));
+  }
+  async aulaCode(ticket: string, taskId: string) {
+    return z.object({ code: z.string().regex(/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{5}$/) }).parse(await this.call('/access/aula/code', undefined, JSON.stringify({ ticket, taskId }))).code;
   }
   async context(sessionId: string, secret: string): Promise<AnyContext> {
     uuid.parse(sessionId);

@@ -1,4 +1,4 @@
-import { Api, ApiError } from '../delivery/api';
+import { Api, ApiError, type AulaGroup, type AulaSession } from '../delivery/api';
 import { Delivery, type DeliveryState } from '../delivery/outbox';
 import { Session, type Credential } from '../runtime/session';
 import { Database } from '../storage/database';
@@ -21,6 +21,9 @@ function offlineIcon(): SVGSVGElement {
   return svg;
 }
 
+const FIGURES: [string, string][] = [['🐱', 'Gato'], ['🐶', 'Perro'], ['⭐', 'Estrella'], ['🌙', 'Luna'], ['🚀', 'Cohete'], ['🌈', 'Arcoíris'], ['🍎', 'Manzana'], ['⚽', 'Balón']];
+const GAME_ICONS: Record<string, string> = { 'TG-01': '🌠', 'TG-02': '🔤', 'TG-03': '🧠', 'TG-04': '🎵' };
+function gameIcon(taskId: string): HTMLElement { const node = el('span', 'aula-game-icon', GAME_ICONS[taskId] ?? '🎮'); node.setAttribute('aria-hidden', 'true'); return node; }
 type Screen = 'access' | 'pending' | 'instructions' | 'example' | 'running' | 'finish';
 export class App {
   private db?: Database;
@@ -73,6 +76,14 @@ export class App {
   private offlineDialog?: HTMLDialogElement;
   private playedSessionId?: string;
   private savedNotified?: string;
+  // Modo aula (en memoria; al recargar el niño vuelve a escribir su apodo).
+  private codeMode = false;
+  private aulaGroups?: AulaGroup[];
+  private aulaGroupsError = '';
+  private aulaGroup?: AulaGroup;
+  private aulaFigure: number | null = null;
+  private aula?: AulaSession;
+  private aulaMessage = '';
 
   constructor(private root: HTMLElement) {}
   async init(): Promise<void> {
@@ -236,7 +247,7 @@ export class App {
     this.externalActive = false; this.screen = 'access';
     this.main.replaceChildren();
     const done = el('section', 'access-sheet');
-    done.append(el('h1', '', title), el('p', 'intro-copy', message), this.publicLink('/', 'Ingresar otro código'));
+    done.append(el('h1', '', title), el('p', 'intro-copy', message), this.aula ? this.backToGames() : this.publicLink('/', 'Ingresar otro código'));
     this.main.append(done); this.say(message);
   }
   private render(focus = false): void {
@@ -303,12 +314,128 @@ export class App {
     form.append(label, input, help, submit, feedback); return form;
   }
   private accessScreen(): void {
+    if (this.codeMode || !this.ready) { this.codeScreen(); return; }
+    const section = el('section', 'access-sheet aula-sheet');
+    if (this.aula) this.aulaGamesView(section);
+    else if (this.aulaGroup) this.aulaWhoView(section);
+    else this.aulaGroupsView(section);
+    this.main.append(section);
+  }
+  private codeScreen(): void {
     const section = el('section', 'access-sheet');
     section.append(el('h1', '', 'Tu actividad empieza aquí'), el('p', 'intro-copy', 'Ingresa el código que te compartió tu profesor.'), this.accessForm(), this.publicLink('/pendientes', 'Enviar una actividad pendiente'));
     if (!this.ready) section.append(el('p', 'availability', this.problem || 'Comprobando el respaldo de este navegador…'));
+    else section.append(button('Entrar con mi apodo', () => { this.codeMode = false; this.render(true); }, 'button quiet'));
     section.append(el('p', 'access-help', 'No necesitas una cuenta ni escribir tu nombre. No compartas tu código.'));
     this.main.append(section);
   }
+  private loadAulaGroups(): void {
+    this.aulaGroupsError = '';
+    void this.api.aulaGroups().then(items => { this.aulaGroups = items; }).catch(() => { this.aulaGroups = []; this.aulaGroupsError = 'No pudimos ver los cursos. Revisa la conexión y toca «Buscar de nuevo».'; })
+      .finally(() => { if (this.screen === 'access' && !this.aulaGroup && !this.codeMode) this.render(); });
+  }
+  private aulaGroupsView(section: HTMLElement): void {
+    section.append(el('h1', '', '¿Cuál es tu curso?'), el('p', 'intro-copy', 'Toca tu curso para entrar con tu apodo.'));
+    if (!this.aulaGroups) { section.append(el('p', 'availability', 'Buscando los cursos abiertos…')); this.loadAulaGroups(); }
+    else if (!this.aulaGroups.length) section.append(el('p', 'delivery-note', this.aulaGroupsError || 'Tu profesor todavía no ha abierto la clase. Espera un momento y toca «Buscar de nuevo».'));
+    else {
+      const list = el('div', 'aula-groups');
+      for (const g of this.aulaGroups) {
+        const b = button(`${g.name}`, () => { this.aulaGroup = g; this.aulaFigure = null; this.aulaMessage = ''; this.render(true); }, 'button aula-group');
+        b.prepend(el('span', 'aula-grade', `Grado ${g.grade}`)); list.append(b);
+      }
+      section.append(list);
+    }
+    const actions = el('div', 'aula-actions');
+    actions.append(button('Buscar de nuevo', () => { this.aulaGroups = undefined; this.render(); }), button('Tengo un código', () => { this.codeMode = true; this.render(true); }, 'button quiet'));
+    section.append(actions);
+  }
+  private aulaWhoView(section: HTMLElement): void {
+    const group = this.aulaGroup!;
+    section.append(el('h1', '', 'Escribe tu apodo'), el('p', 'intro-copy', `Curso ${group.name}. Luego toca tu figura secreta.`));
+    const form = el('form', 'access-form aula-form'); form.noValidate = true;
+    const label = el('label', '', 'Tu apodo'); label.htmlFor = 'aula-alias';
+    const input = el('input', 'code-input'); input.id = 'aula-alias'; input.autocomplete = 'off'; input.autocapitalize = 'characters'; input.spellcheck = false; input.maxLength = 20;
+    const feedback = el('p', 'availability', this.aulaMessage); feedback.setAttribute('role', 'status');
+    const figures = el('div', 'figure-grid'); figures.setAttribute('role', 'group'); figures.setAttribute('aria-label', 'Tu figura secreta');
+    FIGURES.forEach(([emoji, name], index) => {
+      const b = button('', () => { this.aulaFigure = index; feedback.textContent = ''; for (const node of figures.querySelectorAll('button')) node.setAttribute('aria-pressed', String(node === b)); }, 'figure-button');
+      b.setAttribute('aria-pressed', String(this.aulaFigure === index)); b.setAttribute('aria-label', name);
+      b.append(el('span', 'figure-emoji', emoji), el('span', 'figure-name', name)); figures.append(b);
+    });
+    const submit = button('Entrar', () => undefined, 'button primary'); submit.type = 'submit';
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      if (this.claiming) return;
+      if (Date.now() < this.retryCodeAt) { feedback.textContent = `Espera ${Math.ceil((this.retryCodeAt - Date.now()) / 1000)} segundos antes de reintentar.`; return; }
+      const alias = input.value.trim();
+      if (alias.length < 3) { feedback.textContent = 'Escribe tu apodo (al menos 3 letras).'; input.focus(); return; }
+      if (this.aulaFigure === null) { feedback.textContent = 'Toca tu figura secreta.'; return; }
+      this.claiming = true; submit.disabled = true; feedback.textContent = 'Buscando tus juegos…';
+      void this.api.aulaIdentify(group.id, alias, this.aulaFigure).then(session => { this.aula = session; this.aulaMessage = ''; this.render(true); this.say(`Hola, ${session.alias}`); })
+        .catch(error => {
+          this.aulaFigure = null;
+          for (const node of figures.querySelectorAll('button')) node.setAttribute('aria-pressed', 'false');
+          if (error instanceof ApiError && error.status === 429) { this.retryCodeAt = Date.now() + error.retryAfterMs; feedback.textContent = `Espera ${Math.max(1, Math.ceil(error.retryAfterMs / 1000))} segundos y vuelve a intentarlo.`; }
+          else if (error instanceof ApiError && error.reason === 'CLASS_CLOSED') feedback.textContent = 'La clase está cerrada. Pide a tu profesor que la abra.';
+          else if (error instanceof ApiError && (error.status === 0 || error.status >= 500)) feedback.textContent = 'No pudimos comprobarlo. Revisa la conexión y vuelve a intentarlo.';
+          else feedback.textContent = 'El apodo o la figura no coinciden. Inténtalo otra vez o pide ayuda a tu profesor.';
+        }).finally(() => { this.claiming = false; submit.disabled = false; });
+    });
+    form.append(label, input, el('p', 'access-help', 'Es el apodo que te dio tu profesor. Da igual si usas mayúsculas o tildes.'), el('p', 'figure-title', 'Tu figura secreta'), figures, submit, feedback);
+    section.append(form, button('Cambiar de curso', () => { this.aulaGroup = undefined; this.aulaGroups = undefined; this.aulaMessage = ''; this.render(true); }, 'button quiet'));
+  }
+  private aulaGamesView(section: HTMLElement): void {
+    const aula = this.aula!;
+    section.append(el('h1', '', `¡Hola, ${aula.alias}!`), el('p', 'intro-copy', aula.games.length ? 'Elige un juego para empezar.' : 'Todavía no hay juegos activos para ti. Espera a que tu profesor los active.'));
+    if (!aula.participationAllowed) section.append(el('p', 'delivery-note', 'Por ahora no puedes jugar. Avísale a tu profesor.'));
+    const feedback = el('p', 'availability', this.aulaMessage); feedback.setAttribute('role', 'status');
+    const list = el('ul', 'aula-games');
+    for (const game of aula.games) {
+      const row = el('li', 'aula-game');
+      const play = button(game.canPlay ? 'Jugar' : 'Sin intentos', () => { void this.playAula(game.taskId, play, feedback); }, 'button primary');
+      play.disabled = !game.canPlay;
+      const text = el('div', 'aula-game-text'); text.append(el('h2', '', game.title), el('p', '', game.canPlay ? `Te quedan ${game.attemptsLeft} ${game.attemptsLeft === 1 ? 'intento' : 'intentos'}` : 'Ya usaste todos los intentos'));
+      row.append(gameIcon(game.taskId), text, play); list.append(row);
+    }
+    section.append(list, feedback);
+    const actions = el('div', 'aula-actions');
+    actions.append(button('Actualizar', () => { void this.refreshAula(); }), button('Salir', () => this.leaveAula(), 'button quiet'));
+    section.append(actions);
+  }
+  private leaveAula(): void { this.aula = undefined; this.aulaFigure = null; this.aulaMessage = ''; this.screen = 'access'; this.render(true); }
+  private async refreshAula(): Promise<void> {
+    if (!this.aula) return;
+    try { this.aula = { ...await this.api.aulaGames(this.aula.ticket), ticket: this.aula.ticket }; this.aulaMessage = ''; }
+    catch (error) {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        this.aula = undefined; this.aulaFigure = null;
+        this.aulaMessage = error.reason === 'CLASS_CLOSED' ? 'La clase se cerró. Pide a tu profesor que la abra.' : 'Vuelve a escribir tu apodo y tu figura.';
+      } else this.aulaMessage = 'No pudimos actualizar. Revisa la conexión.';
+    }
+    this.screen = 'access'; this.render(true);
+  }
+  private async playAula(taskId: string, play: HTMLButtonElement, feedback: HTMLElement): Promise<void> {
+    if (this.claiming || !this.session || !this.aula) return;
+    if (!navigator.onLine) { feedback.textContent = 'Necesitamos conexión para abrir el juego.'; return; }
+    this.claiming = true; play.disabled = true; feedback.textContent = 'Abriendo el juego…';
+    try {
+      const code = await this.api.aulaCode(this.aula.ticket, taskId);
+      const context = await this.session.claimCode(code);
+      if (isExternal(context)) { this.claiming = false; await this.runExternal(context); return; }
+      if (!supported(context)) throw new Error('VERSION_UNSUPPORTED');
+      this.context = context; this.launchBound = true; this.lastOut = undefined; this.deliveryState = 'PENDING'; this.screen = 'instructions'; this.status = 'Tu actividad está lista'; this.problem = ''; this.render(true);
+    } catch (error) {
+      play.disabled = false;
+      if (error instanceof ApiError && (error.status === 401 || error.reason === 'CLASS_CLOSED')) { this.claiming = false; await this.refreshAula(); return; }
+      feedback.textContent = error instanceof ApiError && error.reason === 'ACTIVE_SESSION' ? 'Este juego sigue abierto en otro lugar. Espera unos minutos o pide ayuda a tu profesor.'
+        : error instanceof ApiError && error.reason === 'ATTEMPT_LIMIT' ? 'Ya usaste todos los intentos de este juego.'
+        : error instanceof ApiError && error.reason === 'GAME_INACTIVE' ? 'Este juego ya no está activo. Toca «Actualizar».'
+        : error instanceof ApiError && (error.status === 0 || error.status >= 500) ? 'No pudimos abrir el juego. Revisa la conexión y vuelve a intentarlo.'
+        : 'No pudimos abrir este juego. Pide ayuda a tu profesor.';
+    } finally { this.claiming = false; }
+  }
+  private backToGames(): HTMLButtonElement { return button('Volver a mis juegos', () => { void this.refreshAula(); }, 'button primary'); }
   private pendingScreen(): void {
     this.main.append(el('h1', '', 'Actividades pendientes'), el('p', 'intro-copy', 'Solo podemos enviar lo que conserva este navegador. No necesitas volver a jugar.'), this.publicLink('/', 'Ingresar otro código'));
     if (!this.ready) { this.main.append(el('p', 'availability', this.problem || 'Comprobando el respaldo local…')); return; }
@@ -568,7 +695,8 @@ export class App {
     const delivery = el('div', 'delivery-note'); delivery.append(el('h2', '', heading), el('p', '', text));
     if (this.lastOut && !this.memoryOnly && this.deliveryState === 'PENDING') delivery.append(button('Reintentar envío', () => { void this.maintain(true); }));
     section.append(delivery); this.main.append(section);
-    if (this.publicEntry) this.main.append(this.publicLink('/pendientes', 'Enviar una actividad pendiente'), this.publicLink('/', 'Ingresar otro código'));
+    if (this.publicEntry && this.aula && this.deliveryState !== 'PENDING') this.main.append(this.backToGames());
+    else if (this.publicEntry) this.main.append(this.publicLink('/pendientes', 'Enviar una actividad pendiente'), this.publicLink('/', 'Ingresar otro código'));
   }
   private setNetwork(): void { if (this.netNode) this.netNode.dataset.offline = String(!navigator.onLine); }
   private offlinePrompt(): void {

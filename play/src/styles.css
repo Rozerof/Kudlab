@@ -164,3 +164,26 @@ a.button { display: inline-flex; align-items: center; justify-content: center; t
 /* Juegos TG-02 a TG-04 en un marco del mismo origen, a pantalla completa. */
 .external-host { position: fixed; inset: 0; z-index: 20; background: #14264d; }
 .external-game { display: block; width: 100%; height: 100%; border: 0; }
+/* Modo aula: curso → apodo + figura secreta → juegos activos */
+.aula-sheet { max-width: 760px; }
+.aula-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-top: 28px; }
+.aula-group { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 96px; border-radius: 20px; padding: 18px 22px; background: var(--surface); border: 2px solid var(--border); font-size: 1.5rem; text-align: left; }
+.aula-group:hover { border-color: var(--accent); }
+.aula-grade { font-size: .9375rem; font-weight: 700; color: var(--muted); }
+.aula-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.aula-form .code-input { text-transform: uppercase; }
+.figure-title { font-weight: 700; margin-top: 20px; }
+.figure-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 10px; }
+.figure-button { display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 92px; border-radius: 18px; border: 3px solid var(--border); background: var(--surface); color: var(--text); font-weight: 700; padding: 8px 4px; }
+.figure-button:hover { border-color: var(--accent); }
+.figure-button[aria-pressed="true"] { border-color: var(--accent); background: var(--soft); box-shadow: 0 0 0 3px var(--accent) inset; }
+.figure-emoji { font-size: 2.5rem; line-height: 1.1; }
+.figure-name { font-size: .875rem; }
+.aula-form .button.primary { margin-top: 22px; }
+.aula-games { list-style: none; display: grid; gap: 14px; margin-top: 24px; padding: 0; }
+.aula-game { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-radius: 20px; background: var(--surface); border: 2px solid var(--border); }
+.aula-game-icon { font-size: 2.5rem; }
+.aula-game-text { flex: 1; min-width: 0; }
+.aula-game-text h2 { font-size: 1.35rem; }
+.aula-game-text p { color: var(--muted); margin-top: 2px; }
+@media (max-width: 520px) { .figure-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; } .figure-button { min-height: 76px; } .figure-emoji { font-size: 2rem; } .aula-game { flex-wrap: wrap; } }

@@ -387,3 +387,58 @@ body { font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; -w
 .staff-table-region tbody tr:hover { background: #f8fafd; }
 .student-section-summary:hover { background: #f8fafd; border-radius: 1rem; }
 .student-section[open] > .student-section-summary { border-bottom: 1px solid var(--border); border-radius: 1rem 1rem 0 0; margin-bottom: 1.25rem; }
+/* Modo aula */
+.aula-panel { display: grid; gap: 1rem; }
+.aula-panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem; align-items: flex-start; }
+.aula-state { border-radius: 999px; padding: .35rem .9rem; font-weight: 600; font-size: .9375rem; background: #eef1f5; color: #3c4a5e; border: 1px solid var(--border); }
+.aula-state.is-open { background: #e7f6ec; color: #1f6b3a; border-color: #9fd6b1; }
+.aula-select { min-height: 2.75rem; border: 1px solid var(--border); border-radius: .5rem; padding: .4rem .75rem; background: #fff; font: inherit; }
+.aula-games-list { display: grid; gap: .75rem; list-style: none; padding: 0; margin: 0; }
+.aula-game-row { display: grid; gap: .6rem; border: 1px solid var(--border); border-radius: .875rem; padding: .9rem 1rem; background: #fff; }
+.aula-on { color: #1f6b3a; font-weight: 600; }
+.aula-choose { border: 1px dashed var(--border); border-radius: .75rem; padding: .75rem 1rem; }
+.aula-choose-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: .4rem .9rem; margin-top: .5rem; }
+.aula-check { display: flex; gap: .5rem; align-items: center; min-height: 2.25rem; }
+.aula-check input { width: 1.15rem; height: 1.15rem; }
+.aula-roster ul { list-style: none; padding: 0; margin: .5rem 0 0; display: grid; gap: .25rem; }
+.aula-roster li { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); gap: .75rem; padding: .35rem 0; border-bottom: 1px solid var(--border); font-size: .9375rem; }
+.figure-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 6rem)); gap: .5rem; }
+.figure-option { display: flex; flex-direction: column; align-items: center; gap: .1rem; padding: .5rem .25rem; border: 2px solid var(--border); border-radius: .75rem; background: #fff; min-height: 4.5rem; }
+.figure-option[aria-pressed='true'] { border-color: #1c2e57; box-shadow: inset 0 0 0 2px #1c2e57; background: #eef6fd; }
+/* Estrella de prioridad */
+.priority-star { display: inline-flex; align-items: flex-start; gap: .4rem; }
+.priority-star svg { flex: none; margin-top: .1rem; }
+.priority-text { display: grid; line-height: 1.25; }
+.priority-message { font-size: .8125rem; color: var(--muted-foreground); max-width: 22rem; }
+.priority-legend { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.25rem; padding: .75rem 1rem; border: 1px solid var(--border); border-radius: .75rem; background: #fafbfd; }
+/* Panel de observación 0–5 */
+.panel-form { display: grid; gap: 1.25rem; }
+.panel-instruction { border-left: 4px solid var(--primary); padding: .6rem 1rem; background: #f3f9fd; border-radius: .25rem .75rem .75rem .25rem; }
+.panel-meta { display: flex; flex-wrap: wrap; gap: 1rem; }
+.panel-scale-legend { display: flex; flex-wrap: wrap; gap: .4rem 1rem; font-size: .875rem; }
+.panel-scale-legend b { display: inline-grid; place-items: center; width: 1.4rem; height: 1.4rem; border-radius: 50%; color: #1b1b1b; margin-right: .3rem; font-size: .8rem; }
+.panel-block { border: 1px solid var(--border); border-radius: .875rem; padding: .9rem 1rem 1rem; display: grid; gap: .75rem; background: #fff; }
+.panel-block legend { font-weight: 700; padding: 0 .35rem; }
+.panel-block-key { display: inline-block; background: #1c2e57; color: #fff; border-radius: .4rem; padding: .05rem .45rem; margin-right: .25rem; font-size: .875rem; }
+.panel-question { display: grid; gap: .5rem; padding-top: .6rem; border-top: 1px solid #eef1f5; }
+.panel-qid { font-size: .75rem; font-weight: 700; color: var(--muted-foreground); margin-right: .35rem; }
+.panel-line { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.panel-dots { position: relative; display: grid; grid-template-columns: repeat(6, 3.1rem); gap: .35rem; }
+.panel-dots::before { content: ''; position: absolute; left: 1.5rem; right: 1.5rem; top: 50%; height: 2px; background: #d5dce6; z-index: 0; }
+.panel-dot { position: relative; z-index: 1; display: grid; place-items: center; width: 3.1rem; height: 3.1rem; border-radius: 50%; border: 2px solid #c3ccd8; background: #fff; line-height: 1; }
+.panel-dot-num { font-weight: 700; font-size: .8rem; }
+.panel-dot-face { font-size: 1.05rem; opacity: .55; }
+.panel-dot.is-on { box-shadow: 0 0 0 3px #1c2e57; }
+.panel-dot.is-on .panel-dot-face { opacity: 1; font-size: 1.35rem; }
+.panel-dot.is-on .panel-dot-num { color: #111; }
+.panel-none { min-height: 2.75rem; border-radius: 999px; padding: .35rem .9rem; border: 2px dashed #9aa7b8; background: #fff; font-size: .875rem; font-weight: 600; color: #3c4a5e; }
+.panel-none.is-on { border-style: solid; border-color: #1c2e57; background: #eef1f5; box-shadow: inset 0 0 0 1px #1c2e57; }
+.panel-note { width: 100%; border: 1px solid var(--border); border-radius: .5rem; padding: .5rem .75rem; font: inherit; resize: vertical; }
+.panel-footer { position: sticky; bottom: 0; display: grid; gap: .5rem; padding: .75rem 0; background: linear-gradient(to top, #fff 85%, transparent); }
+.panel-summary { width: 100%; border-collapse: collapse; font-size: .9375rem; }
+.panel-summary th, .panel-summary td { padding: .5rem .6rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; }
+.panel-summary thead th { font-weight: 600; color: var(--muted-foreground); font-size: .875rem; }
+.panel-bar { display: flex; align-items: center; gap: .5rem; min-width: 7rem; }
+.panel-bar > span { display: block; height: .55rem; border-radius: 999px; background: #5b7088; flex: none; max-width: 5rem; min-width: .2rem; }
+.panel-bar b { font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .panel-dots { grid-template-columns: repeat(6, 2.6rem); } .panel-dot { width: 2.6rem; height: 2.6rem; } .figure-picker { grid-template-columns: repeat(4, minmax(0, 1fr)); } .aula-roster li { grid-template-columns: 1fr 1fr; } }
