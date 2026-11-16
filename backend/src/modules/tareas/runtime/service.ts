@@ -11,11 +11,10 @@ import { withAcademicAccess, type AcademicActor, type AcademicTransaction as Tx 
 import { participationProvider, requireParticipation, syntheticEnabled, type GameDependencies } from '../../academico/shared/participation.js';
 import { hasActiveIdentity } from '../../usuarios/shared/accounts.types.js';
 import { notFound } from '../../academico/shared/academic.errors.js';
-import { EXTERNAL_RULES, isExternalTask } from '../../evolucion/external.js';
+import { knownRule } from '../../evolucion/external.js';
 import { compatible, envelopeSchema, externalEnvelopeSchema, hash, secretDigest, uuid, uuidV4, secret, type Envelope } from './contract.js';
 import { GameError, conflict } from './errors.js';
 import { cursorFor, cursorPosition, decryptGrant, encryptGrant, runtimeSettings } from './security.js';
-import { RULE } from '../../evolucion/tg01.js';
 import { requestInput, createInput } from './dto.js';
 import { accessCodes, accessClaims } from '../../../db/schema/access.js';
 import { accessDigest, accessSettings, codeInput, newCode, openCode, sealCode } from './access-security.js';
@@ -52,7 +51,7 @@ export function createGameService(deps: GameDependencies = {}) {
     await requireStartedAuthorization(tx, s);
   }
   const methodAllowed = (rule: typeof indicatorRules.$inferSelect) => hash(rule.definition) === rule.definitionHash &&
-    hash(rule.definition) === hash(isExternalTask(rule.taskId) ? EXTERNAL_RULES[rule.taskId] : RULE) && (rule.approvalStatus === 'APPROVED' || syntheticEnabled(deps));
+    hash(rule.definition) === hash(knownRule(rule.code)) && (rule.approvalStatus === 'APPROVED' || syntheticEnabled(deps));
   async function ownGroup(tx: Tx, actor: AcademicActor, id: string) {
     resourceId(id);
     const [group] = await tx.select().from(groups).where(and(eq(groups.id, id), eq(groups.teacherId, actor.accountId))).for('share');

@@ -13,7 +13,8 @@ type RuleRow = { approvalStatus: 'PROPOSED' | 'APPROVED'; approvedAt: Date | nul
 // `approvalReference` no se expone.
 export function buildIndicatorCatalog(row: RuleRow, external: Partial<Record<string, RuleRow>> = {}): IndicatorDefinitionDto[] {
   const ref = (r: RuleRow, code: string, version: number): RuleRef | null => r ? { code, version, approval: { current: r.approvalStatus, approvedAt: r.approvedAt?.toISOString() ?? null } } : null;
-  const rule = ref(row, RULE.code, RULE.version);
+  // Si TG-01 ya está publicada con el juego TD (regla TG01-EXT-1), sus indicadores muestran esa regla.
+  const rule = external['TG-01'] !== undefined ? ref(external['TG-01'], EXTERNAL_RULES['TG-01'].code, EXTERNAL_RULES['TG-01'].version) : ref(row, RULE.code, RULE.version);
   return [...INDICATOR_DEFINITIONS.map(d => ({ ...d, scopes: [...d.scopes], unavailabilityReasons: [...d.unavailabilityReasons], rule })),
     ...EXTERNAL_INDICATOR_DEFINITIONS.filter(d => external[d.taskId] !== undefined).map(d => {
       const r = EXTERNAL_RULES[d.taskId as keyof typeof EXTERNAL_RULES];

@@ -1,6 +1,13 @@
 {
-  "_comentario": "Juegos que Kudlab Play descarga al compilar desde los repositorios de Alexander Niño. ref = commit fijo (probado el 13-11-2026) o una rama como main para tomar siempre la última versión.",
+  "_comentario": "Juegos que Kudlab Play descarga al compilar desde los repositorios de Alexander Niño. ref = commit fijo (probado el 13-11-2026; TG-01 el 16-11-2026) o una rama como main para tomar siempre la última versión.",
   "games": [
+    {
+      "taskId": "TG-01",
+      "slug": "tg-01",
+      "title": "Lluvia de estrellas",
+      "repo": "https://github.com/AlexanderNino97/TD-LLUVIA-DE-ESTRELLAS.git",
+      "ref": "7047192ee0e10c169f0f198ed1437f91d15ac3e5"
+    },
     {
       "taskId": "TG-02",
       "slug": "tg-02",

@@ -18,7 +18,7 @@ export async function prepareLocalTg01() {
     const changed = !task.isEnabled || before?.id !== publishedVersionId;
     if (changed) await tx.update(tasks).set({ isEnabled: true, revision: task.revision + 1 }).where(eq(tasks.id, task.id));
     // Modo local con datos ficticios: también publica y habilita TG-02 a TG-04.
-    for (const id of EXTERNAL_TASK_IDS) {
+    for (const id of EXTERNAL_TASK_IDS.filter(x => x !== 'TG-01')) {
       const [t] = await tx.select().from(tasks).where(eq(tasks.id, id)).for('update');
       if (!t) continue; // catálogo sin la tarea (bases anteriores a la migración 0017)
       await publishExternal(id, tx);

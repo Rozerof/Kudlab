@@ -4,6 +4,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { reset } from '../helpers.js';
 import { gameFixture, testGameApp } from '../game-fixture.js';
 import { normalizeAlias } from '../../src/modules/tareas/runtime/aula-security.js';
+import { publishExternal } from '../../src/modules/tareas/catalog/publish.js';
 import { assertResponse, operations, readContract } from '../openapi.helpers.js';
 
 process.env.GAME_RUNTIME_ORIGIN = 'http://127.0.0.1:4178';
@@ -93,5 +94,16 @@ describe('Modo aula', () => {
     const documented = operations(contract).filter(([route]) => route.includes('/aula') || route.endsWith('/play-profile')).map(([, , op]) => op.operationId);
     expect(documented).toHaveLength(12);
     expect([...covered].filter(id => documented.includes(id)).sort()).toEqual(documented.sort());
+  });
+  it('TG-01 publicada con el juego TD de Lluvia de estrellas: el modo aula entrega el contexto ext-1', async () => {
+    const f = await gameFixture(), t = f.a.teacher, group = f.student.groupId;
+    await publishExternal('TG-01');
+    await call(`/students/${f.student.id}/play-profile`, { alias: 'Cometa', figure: 2 }, t, 'PUT');
+    await call(`/groups/${group}/aula/open`, { minutes: 30 }, t);
+    expect((await call(`/groups/${group}/aula/activations`, { taskId: 'TG-01', audience: 'GROUP' }, t)).status).toBe(200);
+    const who = await call('/game-runtime/access/aula/identify', { groupId: group, alias: 'COMETA', figure: 2 });
+    const ctx = await call('/game-runtime/access/aula/claim', { ticket: who.body.ticket, taskId: 'TG-01', claimId: randomUUID(), runtimeSecret: randomBytes(32).toString('base64url') });
+    expect(ctx.status, JSON.stringify(ctx.body)).toBe(200);
+    expect(ctx.body).toMatchObject({ taskId: 'TG-01', contractVersion: 'ext-1', gameBuildId: 'td-lluvia-estrellas-1' });
   });
 });

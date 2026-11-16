@@ -98,6 +98,8 @@ export function parseAssignment(v: unknown): Assignment | undefined {
   if (v.recipients.length !== v.recipientCount || new Set(v.recipients.map(r => r.id)).size !== v.recipients.length) return;
   return v as Assignment;
 }
+// Lluvia de estrellas del repositorio AlexanderNino97/TD-LLUVIA-DE-ESTRELLAS (contrato ext-1).
+export const TG01_TD_BUILD = 'td-lluvia-estrellas-1';
 export function parseSessionSummary(v: unknown): SessionSummary | undefined {
   if (!object(v) || !isId(v.id) || !isId(v.studentId) || !isId(v.assignmentId) || !TASK_IDS.includes(v.taskId as TaskId) || !['SUPERVISED', 'CODE'].includes(String(v.launchMode)) ||
     !Object.hasOwn(executionLabels, String(v.executionStatus)) || !Object.hasOwn(processingLabels, String(v.processingStatus)) ||
@@ -106,15 +108,16 @@ export function parseSessionSummary(v: unknown): SessionSummary | undefined {
   return v as SessionSummary;
 }
 export function parseSession(v: unknown): SessionDetail | undefined {
-  if (!parseSessionSummary(v) || !object(v) || !isId(v.publishedVersionId) || typeof v.configurationHash !== 'string' || !/^[a-f0-9]{64}$/.test(v.configurationHash) || (v.taskId === 'TG-01' && !validConfiguration(v.configuration)) || !numeric(v.measuredDurationMs) ||
+  if (!parseSessionSummary(v) || !object(v) || !isId(v.publishedVersionId) || typeof v.configurationHash !== 'string' || !/^[a-f0-9]{64}$/.test(v.configurationHash) || (v.taskId === 'TG-01' && v.gameBuildId !== TG01_TD_BUILD && !validConfiguration(v.configuration)) || !numeric(v.measuredDurationMs) ||
     ![null, 'completed', 'interrupted'].includes(v.declaredState as string | null) || v.terminationReason !== null && !['time_limit', 'user_exit', 'visibility_lost', 'script_error', 'storage_failure', 'frame_gap', 'layout_changed', 'recovered_after_reload', 'evidence_limit', 'resource_error'].includes(String(v.terminationReason))) return;
-  // TG-02 a TG-04 (juegos externos): configuración y dispositivo propios del juego; no aplican las reglas de TG-01.
-  const adaptive = v.taskId === 'TG-01' && object(v.configuration) && v.configuration.layoutRule === 'VIEWPORT_FIT_V2';
-  if (v.taskId === 'TG-01' && (v.gameBuildId !== (adaptive ? 'tg01-viewport-rebuild-2' : 'tg01-reference-rebuild-1') || v.device !== null && !validDevice(v.device, adaptive))) return;
+  // Juegos TD (TG-02 a TG-04 y la Lluvia de estrellas TD): configuración y dispositivo propios del juego; no aplican las reglas de la TG-01 anterior.
+  const legacyTg01 = v.taskId === 'TG-01' && v.gameBuildId !== TG01_TD_BUILD;
+  const adaptive = legacyTg01 && object(v.configuration) && v.configuration.layoutRule === 'VIEWPORT_FIT_V2';
+  if (legacyTg01 && (v.gameBuildId !== (adaptive ? 'tg01-viewport-rebuild-2' : 'tg01-reference-rebuild-1') || v.device !== null && !validDevice(v.device, adaptive))) return;
   if (v.receipt !== null && (!object(v.receipt) || !isId(v.receipt.submissionId) || !date(v.receipt.receivedAt) || typeof v.receipt.evidenceHash !== 'string' || !/^[a-f0-9]{64}$/.test(v.receipt.evidenceHash))) return;
   const c = v.calculation;
   if (object(c) && object(c.summary) && Object.keys(c.summary).length && (!count(c.summary.observed) || !count(c.summary.included) || !count(c.summary.excluded) || c.summary.observed !== c.summary.included + c.summary.excluded)) return;
-  if (c !== null && (!object(c) || !isId(c.runId) || !/^TG0[1-4]-DESCRIPTIVE-\d+$/.test(String(c.ruleCode)) || !count(c.ruleVersion) || !['PENDING', 'PROCESSING', 'SUCCEEDED', 'FAILED'].includes(String(c.status)) || c.calculatedAt !== null && !date(c.calculatedAt) || !object(c.summary) || !Array.isArray(c.indicators) || !c.indicators.every(i => object(i) && Object.hasOwn(metricLabels, String(i.metricCode)) && ['SESSION', 'SEGMENT_1', 'SEGMENT_2', 'SEGMENT_3'].includes(String(i.scope)) && ['%', 'ms', 'items', 'pts'].includes(String(i.unit)) && count(i.sampleSize) && numeric(i.numerator) && numeric(i.denominator) &&
+  if (c !== null && (!object(c) || !isId(c.runId) || !/^TG0[1-4]-(DESCRIPTIVE|EXT)-\d+$/.test(String(c.ruleCode)) || !count(c.ruleVersion) || !['PENDING', 'PROCESSING', 'SUCCEEDED', 'FAILED'].includes(String(c.status)) || c.calculatedAt !== null && !date(c.calculatedAt) || !object(c.summary) || !Array.isArray(c.indicators) || !c.indicators.every(i => object(i) && Object.hasOwn(metricLabels, String(i.metricCode)) && ['SESSION', 'SEGMENT_1', 'SEGMENT_2', 'SEGMENT_3'].includes(String(i.scope)) && ['%', 'ms', 'items', 'pts'].includes(String(i.unit)) && count(i.sampleSize) && numeric(i.numerator) && numeric(i.denominator) &&
     (i.status === 'CALCULATED' && typeof i.value === 'number' && Number.isFinite(i.value) && i.unavailabilityReason === null || i.status === 'NOT_AVAILABLE' && i.value === null && typeof i.unavailabilityReason === 'string' && Object.hasOwn(unavailableLabels, i.unavailabilityReason))))) return;
   return v as SessionDetail;
 }

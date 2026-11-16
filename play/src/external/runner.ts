@@ -1,4 +1,4 @@
-// Ejecuta los juegos TG-02 a TG-04 (repositorios TD-*) dentro de Kudlab Play y entrega su registro al backend
+// Ejecuta los juegos TG-01 a TG-04 (repositorios TD-*) dentro de Kudlab Play y entrega su registro al backend
 // con el contrato «ext-1». El juego corre en un marco del mismo origen, sin token: no habla con la API; Play
 // recibe su registro por postMessage, lo guarda en este navegador y lo envía con la credencial de la sesión.
 import { ApiError, type Api } from '../delivery/api';

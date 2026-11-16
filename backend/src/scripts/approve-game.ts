@@ -1,4 +1,4 @@
-// Aprueba la regla de indicadores de TG-02, TG-03 o TG-04 con una referencia explícita de la decisión del responsable.
+// Aprueba la regla de indicadores de TG-01 (juego TD), TG-02, TG-03 o TG-04 con una referencia explícita de la decisión del responsable.
 // Uso: npm run game:approve -- --task=TG-02 --reference=KUDLAB-TG02-APPROVAL-AAAAMMDD-01
 import { and, eq } from 'drizzle-orm';
 import { db, pool } from '../db/client.js';
@@ -9,8 +9,8 @@ import { publishExternal } from '../modules/tareas/catalog/publish.js';
 try {
   const arg = (k: string) => process.argv.find(a => a.startsWith(`--${k}=`))?.slice(k.length + 3);
   const task = arg('task'), reference = arg('reference');
-  if (!task || !isExternalTask(task)) throw new Error('Usa --task=TG-02, --task=TG-03 o --task=TG-04');
-  if (!reference || !/^KUDLAB-TG0[234]-APPROVAL-\d{8}-\d{2}$/.test(reference) || !reference.includes(task.replace('-', ''))) throw new Error('Referencia requerida: --reference=KUDLAB-TG0X-APPROVAL-AAAAMMDD-NN');
+  if (!task || !isExternalTask(task)) throw new Error('Usa --task=TG-01, --task=TG-02, --task=TG-03 o --task=TG-04');
+  if (!reference || !/^KUDLAB-TG0[1-4]-APPROVAL-\d{8}-\d{2}$/.test(reference) || !reference.includes(task.replace('-', ''))) throw new Error('Referencia requerida: --reference=KUDLAB-TG0X-APPROVAL-AAAAMMDD-NN');
   const rule = EXTERNAL_RULES[task];
   await db.transaction(async tx => {
     await publishExternal(task, tx);

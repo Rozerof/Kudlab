@@ -4,7 +4,7 @@ import { db } from '../../db/client.js';
 import { calculationRuns, gameSessions, resultReceipts, rawEvents, sessionIncidents, recipients, assignments, gameConfigurations, indicatorRules, calculatedIndicators, externalResults } from '../../db/schema/game.js';
 import { taskPublishedVersions } from '../../db/schema/tasks.js';
 import { envelopeSchema, externalEnvelopeSchema, hash } from '../tareas/runtime/contract.js';
-import { calculateExternal, EXTERNAL_RULES, isExternalTask } from './external.js';
+import { calculateExternal, EXTERNAL_CONTRACT, EXTERNAL_RULES, isExternalTask } from './external.js';
 import { syntheticEnabled, type GameDependencies } from '../academico/shared/participation.js';
 import { calculate, RULE } from './tg01.js';
 
@@ -33,8 +33,8 @@ export async function processOne(deps: GameDependencies = {}) {
     if (!row || row.config.ruleVersionId !== claimed.ruleVersionId || hash(row.rule.definition) !== row.rule.definitionHash) throw new Error('RULE_UNSUPPORTED');
     const allowed = row.rule.approvalStatus === 'APPROVED' || synthetic;
     let result: { indicators: { metricCode: string; scope: string; status: 'CALCULATED' | 'NOT_AVAILABLE'; value: number | null; unit: string; numerator: number | null; denominator: number | null; sampleSize: number; unavailabilityReason: string | null }[]; decisions: unknown; summary: unknown };
-    if (isExternalTask(row.s.taskId)) {
-      if (row.rule.definitionHash !== hash(EXTERNAL_RULES[row.s.taskId])) throw new Error('RULE_UNSUPPORTED');
+    if (row.config.contractVersion === EXTERNAL_CONTRACT) {
+      if (!isExternalTask(row.s.taskId) || row.rule.definitionHash !== hash(EXTERNAL_RULES[row.s.taskId])) throw new Error('RULE_UNSUPPORTED');
       const [stored] = await db.select().from(externalResults).where(eq(externalResults.sessionId, claimed.sessionId));
       const r = row.receipt;
       const e = externalEnvelopeSchema.parse({ contractVersion: r.contractVersion, sessionId: row.s.id, submissionId: r.submissionId, taskId: row.s.taskId,
@@ -42,7 +42,7 @@ export async function processOne(deps: GameDependencies = {}) {
         state: r.producerState, terminationReason: r.terminationReason, clock: { id: r.clockId, timeOriginUnixMs: r.timeOriginUnixMs },
         timing: { startedAtMs: r.startedAtMs, finishedAtMs: r.finishedAtMs, lastCheckpointAtMs: r.lastCheckpointAtMs }, device: r.device, payload: stored?.payload });
       if (hash(e) !== claimed.evidenceHash) throw new Error('EVIDENCE_HASH_MISMATCH');
-      result = calculateExternal(row.s.taskId, e.payload.events, allowed);
+      result = calculateExternal(row.s.taskId, e.payload.events, allowed, e.state === 'completed');
     } else {
     if (row.rule.definitionHash !== hash(RULE)) throw new Error('RULE_UNSUPPORTED');
     const trials = await db.select().from(rawEvents).where(eq(rawEvents.sessionId, claimed.sessionId)).orderBy(asc(rawEvents.trial));

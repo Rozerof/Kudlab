@@ -58,11 +58,15 @@ Servicios (todos con plan gratuito):
 
    ```bash
    npm run game:publish-all
+   npm run game:approve -- --task=TG-01 --reference=KUDLAB-TG01-APPROVAL-20261116-01
    npm run game:approve -- --task=TG-02 --reference=KUDLAB-TG02-APPROVAL-20261113-01
    npm run game:approve -- --task=TG-03 --reference=KUDLAB-TG03-APPROVAL-20261113-01
    npm run game:approve -- --task=TG-04 --reference=KUDLAB-TG04-APPROVAL-20261113-01
-   npm run game:publish && npm run game:approve-tg01 -- --confirm=KUDLAB-TG01-APPROVAL-20261111-01
    ```
+
+   TG-01 usa el juego de `AlexanderNino97/TD-LLUVIA-DE-ESTRELLAS` (contrato ext-1). La versión anterior de TG-01
+   (`npm run game:publish`, juego propio de Play) solo se conserva para leer la historia.
+   Si TG-01 ya estaba activada en el modo aula, desactívala y actívala de nuevo para que use el juego nuevo.
 
    Después, el administrador habilita cada actividad desde *Tareas* en la plataforma docente.
 
