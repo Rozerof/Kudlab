@@ -6,7 +6,7 @@ import type { ConsentSnapshot } from '../consents/types.ts';
 import { consentValidity } from '../consents/types.ts';
 import type { DraftLease, StudentDraftHost, StudentRefresh } from './student-drafts.ts';
 import type { FormEvent, ReactNode } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ChartLine, ClipboardList, FileSignature, Gamepad2, LayoutGrid, NotebookPen, Pencil, Settings2, Star, StickyNote } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,7 +34,8 @@ import type { NotesApi } from '../notes/api.ts';
 import type { ObservationsApi } from '../../seguimiento/observations/api.ts';
 import { observationMatrixPath } from '../../seguimiento/observations/navigation.ts';
 import type { AulaApi } from '../../aula/api.ts';
-import { ClassroomMode, PriorityLegend, PriorityStar, StudentPlayAccess, StudentSummaryButton, useAliases, usePriority } from '../../aula/Aula';
+import { ClassroomMode, PriorityLegend, PriorityStar, StudentPlayAccess, StudentSummaryButton, useAliases, useClassroomStudent, usePriority } from '../../aula/Aula';
+import { FIGURES } from '../../aula/api.ts';
 import { ObservationPanel } from '../../aula/ObservationPanel';
 
 export const studentsPath = '/academico/estudiantes';
@@ -149,6 +150,16 @@ export function StudentDetail({ api, readApi, activities, consents, observations
   }, [studentId, group?.id, actorId, apiOrigin, drafts, queryKey]);
   const [notice, setNotice] = useState(() => window.history.state?.studentNotice === 'updated' ? 'Datos actualizados' : window.history.state?.studentNotice === 'created' ? 'Estudiante registrado' : '');
   const [checking, setChecking] = useState(false);
+  const [tab, setTab] = useState<FichaTab>('resumen');
+  const priorities = usePriority(aula ?? noAula, aula ? student?.groupId : undefined);
+  const me = useClassroomStudent(aula, student?.groupId, student?.id);
+  // Un borrador recuperado abre la pestaña donde quedó (consentimiento, observaciones o anotaciones).
+  useEffect(() => {
+    if (!lease) return;
+    if (lease.slot('consent').read()?.focus) setTab('consentimiento');
+    else if (lease.slot('observations').read()?.focus) setTab('observacion');
+    else if (lease.slot('annotations').read()?.focus) setTab('anotaciones');
+  }, [lease]);
   useEffect(() => {
     const state: unknown = window.history.state;
     if (state && typeof state === 'object' && !Array.isArray(state) && Object.hasOwn(state, 'studentNotice')) {
@@ -167,41 +178,81 @@ export function StudentDetail({ api, readApi, activities, consents, observations
     lease!.discard(); operationHandle(sessionStorage).clear(); setStudent(undefined); setLease(undefined); setSnapshot(undefined);
     setFailure({ kind: 'error', status: 404, code: 'NOT_FOUND', uncertain: false }); setRefresh(old => ({ ...old, status: 'unavailable' }));
   }
+  const validity = consentValidity(snapshot);
+  const consentLabel = !snapshot ? 'Comprobando…' : snapshot.consent.state === 'CURRENT' ? (validity?.expired ? 'Vencido' : 'Vigente') : snapshot.consent.state === 'REVOKED' ? 'Revocado' : 'Pendiente';
+  const consentOk = snapshot?.consent.state === 'CURRENT' && !validity?.expired;
+  const tabs: { key: FichaTab; label: string; icon: ReactNode; badge?: string; warn?: boolean }[] = [
+    { key: 'resumen', label: 'Resumen', icon: <LayoutGrid aria-hidden="true" /> },
+    { key: 'consentimiento', label: 'Consentimiento', icon: <FileSignature aria-hidden="true" />, badge: consentLabel, warn: Boolean(snapshot) && !consentOk },
+    { key: 'juegos', label: 'Juegos', icon: <Gamepad2 aria-hidden="true" /> },
+    { key: 'observacion', label: 'Observación', icon: <ClipboardList aria-hidden="true" /> },
+    { key: 'notas', label: 'Notas', icon: <NotebookPen aria-hidden="true" /> },
+    { key: 'anotaciones', label: 'Anotaciones', icon: <StickyNote aria-hidden="true" /> },
+    { key: 'registro', label: 'Registro', icon: <Settings2 aria-hidden="true" /> },
+  ];
+  const panel = (key: FichaTab, children: ReactNode) => <div role="tabpanel" id={`ficha-${key}`} aria-labelledby={`ficha-tab-${key}`} hidden={tab !== key} className="ficha-panel">{children}</div>;
+  const initials = student ? `${student.firstName.trim()[0] ?? ''}${student.lastName.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ]/g, '')[0] ?? ''}`.toUpperCase() : '';
+  const star = student ? priorities.get(student.id) : undefined;
   return <div className="staff-stack grid-cols-1 [overflow-wrap:anywhere] [&_.grid>*]:min-w-0"><Back groupId={group?.id} />
     {student ? <>
-      <header className="staff-heading"><Heading>{student.firstName} {student.lastName}</Heading><Link href={`${detailPath(student.id, group?.id)}/editar`} primary>Editar estudiante</Link></header>
-      <p role="status">{notice}</p><Facts student={student} group={group} />
+      <header className="ficha-hero">
+        <div className="ficha-avatar" aria-hidden="true">{initials || '?'}</div>
+        <div className="ficha-identity">
+          <Heading>{student.firstName} {student.lastName}</Heading>
+          <ul className="ficha-chips" aria-label="Datos del estudiante">
+            <li>Código {student.studentCode}</li>
+            <li>{group?.name ? `Curso ${group.name}` : 'Curso no disponible'}</li>
+            <li className={student.isActive ? 'is-ok' : 'is-off'}>{student.isActive ? 'Activo' : 'Inactivo'}</li>
+            <li className={consentOk ? 'is-ok' : snapshot ? 'is-warn' : ''}>Consentimiento: {consentLabel}</li>
+            {me?.alias && <li>Apodo {me.alias}{me.figure !== null ? ` · ${FIGURES[me.figure]?.[0]}` : ''}</li>}
+          </ul>
+        </div>
+        <div className="ficha-actions">
+          <Link href={`${detailPath(student.id, group?.id)}/editar`} primary><Pencil aria-hidden="true" className="size-4" />Editar</Link>
+          {aula && <StudentSummaryButton api={aula} student={student} groupName={group?.name} />}
+        </div>
+      </header>
+      <p role="status" className="empty:hidden">{notice}</p>
       {write?.phase === 'uncertain' && write.id === student.id && <Notice title="Hay un guardado sin confirmar">
         <p>Vuelve a consultar el registro y revisa sus datos antes de guardar de nuevo. La consulta muestra el estado actual, pero no confirma quién hizo el cambio. El borrador se retiró al volver a comprobar tu acceso.</p>
         <Button variant="outline" className="mt-4" onClick={check} disabled={query.fetching}>Comprobar estado actual</Button>
         {checking && !query.fetching && <div className="staff-stack mt-4"><p role="status">Estado confirmado por lectura: {student.isActive ? 'activo' : 'inactivo'}. Revisa también el código y los nombres antes de decidir otro guardado.</p><Button variant="outline" onClick={() => { reviewed(); setChecking(false); }}>Ya revisé el registro</Button></div>}
       </Notice>}
-      {refresh.status !== 'ready' && <p role="status">{query.fetching ? 'Comprobando el estado actual…' : 'La ficha no está actualizada. Las escrituras esperan una nueva comprobación.'}</p>}
-      <div className="flex flex-wrap items-center gap-3"><StudentIndicatorsLink student={student} />{aula && <StudentSummaryButton api={aula} student={student} groupName={group?.name} />}</div>
-      <Section title="Consentimiento informado" hint={snapshot?.consent.state === 'CURRENT' ? (consentValidity(snapshot)?.expired ? 'Vencido' : 'Vigente') : snapshot?.consent.state === 'REVOKED' ? 'Revocado' : 'Pendiente'} open={snapshot !== undefined && (snapshot.consent.state !== 'CURRENT' || Boolean(consentValidity(snapshot)?.expired))}>
-      {lease && <StudentConsent key={`${apiOrigin}:${actorId}:${student.id}:${student.groupId}`} api={consents} studentId={studentId} actorId={actorId} snapshot={snapshot} refresh={refresh} lease={lease} recheck={recheckSelection}
-        onChange={change => { if (activeSequence === sequence.current && lease.valid() && change.studentId === studentId) query.reload(); }} />}
-      </Section>
-      {aula && <Section title="Acceso a los juegos (apodo y figura)" hint={student.isActive ? undefined : 'Inactivo'}><StudentPlayAccess api={aula} student={student} /></Section>}
-      <Section title="Actividades digitales">
-      <StudentAssignments key={student.id} api={activities} student={student} refresh={refresh} />
-      </Section>
-      {aula && <Section title="Panel de observación (0 a 5)" open><ObservationPanel api={aula} student={student} /></Section>}
-      <Section title="Observaciones puntuales (conducta y frecuencia)">
-      {lease && <StudentObservations key={`observations:${apiOrigin}:${actorId}:${student.id}:${student.groupId}`} api={observations} apiOrigin={apiOrigin} actorId={actorId} student={student} refresh={refresh} consentState={snapshot?.consent.state} draft={lease.slot('observations')} lease={lease} recheck={recheckSelection} onAccessLost={lostSelection} />}
-      </Section>
-      <Section title="Notas académicas">
-      <StudentNotes key={`notes:${student.id}`} api={notes} student={student} refresh={refresh} />
-      </Section>
-      <Section title="Anotaciones">
-      {lease && <StudentAnnotations key={`annotations:${apiOrigin}:${actorId}:${student.id}:${student.groupId}`} api={annotations} student={student} refresh={refresh} draft={lease.slot('annotations')} lease={lease} recheck={recheckSelection} onAccessLost={lostSelection} />}
-      </Section>
-      <Section title="Opciones del registro">
-      {student.isActive ? <Deactivate api={api} student={student} locked={Boolean(write) || refresh.status !== 'ready'} onSuccess={() => { setNotice('Estudiante inactivado'); query.reload(); }} review={check} /> : <p>Este registro está inactivo. Un nuevo consentimiento confirmado permite reactivarlo.</p>}
-      </Section>
+      {refresh.status !== 'ready' && <p role="status" className="text-sm text-muted">{query.fetching ? 'Comprobando el estado actual…' : 'La ficha no está actualizada. Las escrituras esperan una nueva comprobación.'}</p>}
+      <nav className="ficha-tabs" role="tablist" aria-label="Secciones de la ficha">{tabs.map(t => <button key={t.key} id={`ficha-tab-${t.key}`} type="button" role="tab" aria-selected={tab === t.key} aria-controls={`ficha-${t.key}`}
+        className={`ficha-tab ${t.warn ? 'has-warn' : ''}`} onClick={() => setTab(t.key)}>{t.icon}<span>{t.label}</span>{t.badge && <span className="ficha-tab-badge">{t.badge}</span>}</button>)}</nav>
+      {panel('resumen', <div className="ficha-overview">
+        <article className="ficha-card"><header><FileSignature aria-hidden="true" /><h2>Consentimiento</h2></header>
+          <p className={`ficha-status ${consentOk ? 'is-ok' : 'is-warn'}`}>{consentLabel}</p>
+          <p className="text-sm text-muted">{!snapshot ? 'Consultando…' : consentOk ? (validity?.until ? `Vigente hasta el ${new Date(`${validity.until}T12:00:00Z`).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })}.` : 'Vigente hasta el fin del año escolar.') : 'Sin consentimiento vigente no puede jugar ni recibir observaciones nuevas.'}</p>
+          <Button variant="outline" onClick={() => setTab('consentimiento')}>{consentOk ? 'Ver documento' : 'Registrar consentimiento'}</Button></article>
+        <article className="ficha-card"><header><Gamepad2 aria-hidden="true" /><h2>Acceso a los juegos</h2></header>
+          {me?.alias ? <p className="ficha-alias"><span>{me.alias}</span>{me.figure !== null && <span className="ficha-figure">{FIGURES[me.figure]?.[0]} {FIGURES[me.figure]?.[1]}</span>}</p> : <p className="ficha-status is-warn">Sin apodo</p>}
+          <p className="text-sm text-muted">Entra a Kudlab Play con su apodo y su figura secreta mientras la clase está abierta.</p>
+          <Button variant="outline" onClick={() => setTab('juegos')}>{me?.alias ? 'Cambiar apodo o figura' : 'Asignar apodo'}</Button></article>
+        <article className="ficha-card"><header><Star aria-hidden="true" /><h2>Prioridad de revisión</h2></header>
+          {star ? <><PriorityStar priority={star} />{star.changes.length > 1 && <ul className="ficha-changes">{star.changes.slice(1, 4).map(c => <li key={c}>{c}</li>)}</ul>}</> : <p className="text-sm text-muted">Consultando…</p>}
+          <p className="text-xs text-muted">Compara al estudiante consigo mismo. No es un diagnóstico.</p></article>
+        <article className="ficha-card"><header><ChartLine aria-hidden="true" /><h2>Seguimiento</h2></header>
+          <p className="text-sm text-muted">Indicadores de los juegos por sesión y el panel de observación docente por periodo.</p>
+          <div className="flex flex-wrap gap-2"><StudentIndicatorsLink student={student} /><Button variant="outline" onClick={() => setTab('observacion')}>Registrar observación</Button></div></article>
+      </div>)}
+      {panel('consentimiento', lease && <StudentConsent key={`${apiOrigin}:${actorId}:${student.id}:${student.groupId}`} api={consents} studentId={studentId} actorId={actorId} snapshot={snapshot} refresh={refresh} lease={lease} recheck={recheckSelection}
+        onChange={change => { if (activeSequence === sequence.current && lease.valid() && change.studentId === studentId) query.reload(); }} />)}
+      {panel('juegos', <div className="ficha-stack">
+        {aula && <section className="ficha-block"><h2>Apodo y figura secreta</h2><StudentPlayAccess api={aula} student={student} /></section>}
+        <section className="ficha-block"><StudentAssignments key={student.id} api={activities} student={student} refresh={refresh} /></section></div>)}
+      {panel('observacion', <div className="ficha-stack">
+        {aula && <section className="ficha-block"><h2>Panel de observación (0 a 5)</h2><ObservationPanel api={aula} student={student} /></section>}
+        <section className="ficha-block">{lease && <StudentObservations key={`observations:${apiOrigin}:${actorId}:${student.id}:${student.groupId}`} api={observations} apiOrigin={apiOrigin} actorId={actorId} student={student} refresh={refresh} consentState={snapshot?.consent.state} draft={lease.slot('observations')} lease={lease} recheck={recheckSelection} onAccessLost={lostSelection} />}</section></div>)}
+      {panel('notas', <StudentNotes key={`notes:${student.id}`} api={notes} student={student} refresh={refresh} />)}
+      {panel('anotaciones', lease && <StudentAnnotations key={`annotations:${apiOrigin}:${actorId}:${student.id}:${student.groupId}`} api={annotations} student={student} refresh={refresh} draft={lease.slot('annotations')} lease={lease} recheck={recheckSelection} onAccessLost={lostSelection} />)}
+      {panel('registro', <section className="ficha-block"><h2>Opciones del registro</h2>
+        {student.isActive ? <Deactivate api={api} student={student} locked={Boolean(write) || refresh.status !== 'ready'} onSuccess={() => { setNotice('Estudiante inactivado'); query.reload(); }} review={check} /> : <p>Este registro está inactivo. Un nuevo consentimiento confirmado permite reactivarlo.</p>}</section>)}
     </> : <><Heading>Ficha de estudiante</Heading>{query.fetching || !failure ? <Loading text="Consultando estudiante" /> : <Failure result={failure} retry={query.reload} />}</>}
   </div>;
 }
+type FichaTab = 'resumen' | 'consentimiento' | 'juegos' | 'observacion' | 'notas' | 'anotaciones' | 'registro';
 
 // Sección desplegable de la ficha: el contenido sigue montado (conserva borradores) aunque esté cerrada.
 function Section({ title, hint, open = false, children }: { title: string; hint?: string; open?: boolean; children: React.ReactNode }) {

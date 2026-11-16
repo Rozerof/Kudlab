@@ -238,3 +238,7 @@ export function StudentSummaryButton({ api, student, groupName }: { api: AulaApi
     {state === 'error' && <span role="status" className="text-sm">No pudimos preparar la ficha. Vuelve a intentarlo.</span>}
   </div>;
 }
+export function useClassroomStudent(api: AulaApi | undefined, groupId: string | undefined, studentId: string | undefined) {
+  const query = useQuery(signal => api && groupId ? api.classroom(groupId, signal) : Promise.resolve({ kind: 'success' as const, data: { groupId: '', window: null, students: [], games: [] } }), `aula-one:${groupId ?? ''}:${studentId ?? ''}`);
+  return query.result?.kind === 'success' ? query.result.data.students.find(s => s.id === studentId) : undefined;
+}
