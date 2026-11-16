@@ -45,7 +45,7 @@ Servicios (todos con plan gratuito):
    - Recursos: el plan más pequeño basta.
 4. *Environment variables* del servicio:
    - El bloque «Northflank» que imprimió `generar-secretos.mjs`.
-   - `DATABASE_URL` = la `POSTGRES_URI` del paso 2. Si Northflank exige SSL, agrega `?sslmode=require` al final.
+   - `DATABASE_URL` = la `POSTGRES_URI` del paso 2. Usa la URI de administrador en formato `postgresql://` (no la JDBC) y agrega `?sslmode=no-verify` al final.
    - `MAIL_USER` = la cuenta Gmail; `MAIL_PASSWORD` = la contraseña de aplicación (16 letras, sin espacios);
      `MAIL_FROM` = la misma cuenta Gmail.
    - `ALLOWED_EMAIL_DOMAINS` (por ejemplo `.edu.co,gmail.com`): dominios aceptados para cuentas; sin ella solo se aceptan correos `.edu.co`.
