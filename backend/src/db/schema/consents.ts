@@ -9,9 +9,12 @@ export const consentRecords = pgTable('consent_records', {
   signedOn: date('signed_on').notNull(), receivedOn: date('received_on').notNull(),
   objectKey: text('object_key').notNull().unique(), mediaType: text('media_type').notNull(),
   byteSize: integer('byte_size').notNull(), sha256: text('sha256').notNull(),
+  // Vigencia: un solo año escolar. Nulo en registros anteriores (se lee como 31 de diciembre del año del curso).
+  validUntil: date('valid_until'),
 }, t => [
   unique('consent_records_student_id_unique').on(t.studentId, t.id),
   check('consent_records_dates_check', sql`${t.signedOn} <= ${t.receivedOn}`),
+  check('consent_records_valid_until_check', sql`${t.validUntil} is null or ${t.validUntil} >= ${t.receivedOn}`),
   check('consent_records_size_check', sql`${t.byteSize} between 1 and 10485760`),
   check('consent_records_type_check', sql`${t.mediaType} in ('application/pdf','image/jpeg','image/png')`),
   check('consent_records_hash_check', sql`${t.sha256} ~ '^[a-f0-9]{64}$'`),
@@ -47,7 +50,7 @@ export const consentOperations = pgTable('consent_operations', {
   fingerprint: text('fingerprint').notNull(), status: text('status').notNull().default('PENDING'),
   recordId: uuid('record_id').notNull(), objectKey: text('object_key'),
   signedOn: date('signed_on'), receivedOn: date('received_on'), mediaType: text('media_type'),
-  byteSize: integer('byte_size'), sha256: text('sha256'), reason: text('reason'),
+  byteSize: integer('byte_size'), sha256: text('sha256'), reason: text('reason'), validUntil: date('valid_until'),
   eventId: uuid('event_id'), rejectionCode: text('rejection_code'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [

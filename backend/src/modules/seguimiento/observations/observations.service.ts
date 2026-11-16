@@ -60,8 +60,10 @@ async function requireEligible(tx: AcademicTransaction, student: typeof students
     if (decision.version < 1) throw observationUnavailable();
     throw observationConflict('CONSENT_REQUIRED');
   }
-  if (decision.state !== 'CURRENT' || decision.version < 1 || decision.validUntil !== null ||
+  if (decision.state !== 'CURRENT' || decision.version < 1 || !(decision.validUntil instanceof Date) || !Number.isFinite(decision.validUntil.getTime()) ||
     typeof decision.authorizationReference !== 'string' || !decision.authorizationReference) throw observationUnavailable();
+  // Consentimiento vencido (terminó su año escolar): se trata como no vigente.
+  if (decision.validUntil <= at) throw observationConflict('CONSENT_REQUIRED');
 }
 export function createObservation(actor: AcademicActor, studentId: string, body: unknown) {
   return writeObservation(actor, studentId, parseObservation(body));

@@ -28,7 +28,7 @@ export function participationProvider(dependencies: GameDependencies): Participa
     if (decision.kind === 'unavailable') return { status: 'UNAVAILABLE' };
     const [student] = await tx.select().from(students).where(eq(students.id, id));
     return student?.isActive && decision.state === 'CURRENT'
-      ? { status: 'ALLOWED', authorizationReference: decision.authorizationReference, validUntil: null }
+      ? { status: 'ALLOWED', authorizationReference: decision.authorizationReference, validUntil: decision.validUntil }
       : { status: 'DENIED' };
   };
   assertTestDatabase();

@@ -4479,7 +4479,7 @@ paths:
               required: [ file, metadata ]
               properties:
                 file: { type: string, contentEncoding: binary, description: 'Documento firmado: PDF, JPEG o PNG.' }
-                metadata: { type: string, description: 'JSON con requestId, expectedVersion, signedOn y receivedOn.', examples: [ '{"requestId":"00000000-0000-4000-8000-000000000020","expectedVersion":0,"signedOn":"2026-01-01","receivedOn":"2026-01-02"}' ] }
+                metadata: { type: string, description: 'JSON con requestId, expectedVersion, signedOn, receivedOn y validUntil opcional (vigencia dentro del año escolar del curso; por defecto el 31 de diciembre).', examples: [ '{"requestId":"00000000-0000-4000-8000-000000000020","expectedVersion":0,"signedOn":"2026-01-01","receivedOn":"2026-01-02"}' ] }
       responses:
         '200':
           description: Reintento idempotente de una operación ya confirmada.
@@ -5934,6 +5934,7 @@ components:
         id: { type: string, format: uuid, description: ID del documento., examples: [ 00000000-0000-4000-8000-000000000022 ] }
         signedOn: { type: string, format: date, description: Fecha de firma., examples: [ '2026-01-01' ] }
         receivedOn: { type: string, format: date, description: Fecha de recepción., examples: [ '2026-01-02' ] }
+        validUntil: { type: [ string, 'null' ], format: date, description: 'Vigencia (un solo año escolar). Nulo en registros anteriores: vale hasta el 31 de diciembre del año del curso.', examples: [ '2026-12-31' ] }
         mediaType: { type: string, enum: [ application/pdf, image/jpeg, image/png ], description: Tipo verificado por firma., examples: [ application/pdf ] }
         byteSize: { type: integer, minimum: 1, description: Tamaño en bytes., examples: [ 120000 ] }
         sha256: { type: string, pattern: '^[a-f0-9]{64}$', description: Resumen del archivo guardado., examples: [ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ] }

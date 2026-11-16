@@ -114,3 +114,15 @@ describe('bounded multipart transport — CA-02', () => {
     await expect(pending).rejects.toThrow('cancelada'); expect(cancelled).toBe(true);
   });
 });
+
+describe('vigencia del consentimiento (un año escolar)', () => {
+  const now = new Date('2026-11-16T15:00:00Z'), base = { requestId: '00000000-0000-4000-8000-000000000020', expectedVersion: 0, signedOn: '2026-11-10', receivedOn: '2026-11-12' };
+  const reason = (input: unknown) => { try { parseConsentMetadata(input, now); return 'ok'; } catch (e) { return (e as ConsentInputError).fields[0]; } };
+  it('es opcional y, si llega, debe ser real, posterior a la recepción y no estar vencida', () => {
+    expect(reason(base)).toBe('ok');
+    expect(reason({ ...base, validUntil: '2026-12-31' })).toBe('ok');
+    expect(reason({ ...base, validUntil: '2026-11-11' })).toEqual({ field: 'validUntil', reason: 'date_order' });
+    expect(reason({ ...base, signedOn: '2026-11-01', receivedOn: '2026-11-01', validUntil: '2026-11-05' })).toEqual({ field: 'validUntil', reason: 'past_date' });
+    expect(reason({ ...base, validUntil: '2026-02-30' })).toEqual({ field: 'validUntil', reason: 'invalid_format' });
+  });
+});

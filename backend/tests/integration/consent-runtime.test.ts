@@ -50,6 +50,16 @@ async function fixture() {
   const revoke = () => request(`/students/${f.student.id}/consents/revocations`, { requestId: randomUUID(), expectedVersion: 1, recordId, reason: 'Retiro ficticio D' }, f.a.teacher);
   return { ...f, input, assignment, grant, claim, context, runtime, path, revoke, recordId };
 }
+it('vigencia: un consentimiento vencido (fin del año escolar) bloquea nuevas asignaciones como si no estuviera vigente', async () => {
+  const f = await fixture();
+  // Sin fecha registrada vale hasta el 31 de diciembre del año escolar del curso (2026 en la prueba).
+  expect((await request('/task-assignments', { ...f.input, requestId: randomUUID() }, f.a.teacher)).status).toBe(new Date().getFullYear() <= 2026 ? 201 : 403);
+  // Los documentos son inmutables: se reemplaza por uno cuya vigencia ya terminó.
+  const expired = randomUUID();
+  await db.insert(consentRecords).values({ id: expired, studentId: f.student.id, signedOn: '2026-01-01', receivedOn: '2026-01-01', validUntil: '2026-01-02', objectKey: `consents/${expired}`, mediaType: 'image/png', byteSize: 1, sha256: 'b'.repeat(64) });
+  await db.insert(consentEvents).values({ studentId: f.student.id, recordId: expired, previousRecordId: f.recordId, version: 2, type: 'REPLACE', actorId: f.a.account.id, actorName: 'Docente ficticio' });
+  expect((await request('/task-assignments', { ...f.input, requestId: randomUUID() }, f.a.teacher)).status).toBe(403);
+});
 it('CA-04/05/08: real CURRENT allows preparation with finite deadline; revocation blocks old context/claim/start without attempt', async () => {
   const f = await fixture();
   expect(Number.isFinite(Date.parse(f.context.startAllowedUntil))).toBe(true);

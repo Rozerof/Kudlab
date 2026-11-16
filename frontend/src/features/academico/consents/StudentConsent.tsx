@@ -1,3 +1,4 @@
+import { consentValidity, longDate } from './types.ts';
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Download, FileText } from 'lucide-react';
@@ -130,7 +131,7 @@ export function StudentConsent({ api, studentId, actorId, snapshot, refresh, lea
     setErrors(issues);
     if (Object.keys(issues).length) { registrationError(issues); return; }
     setFeedback(undefined);
-    const metadata = draft.operation ?? { requestId: crypto.randomUUID(), expectedVersion: draft.baseVersion ?? snapshot.consent.version, signedOn: draft.signedOn, receivedOn: draft.receivedOn };
+    const metadata = draft.operation ?? { requestId: crypto.randomUUID(), expectedVersion: draft.baseVersion ?? snapshot.consent.version, signedOn: draft.signedOn, receivedOn: draft.receivedOn, ...(draft.validUntil ? { validUntil: draft.validUntil } : {}) };
     update({ ...draft, operation: metadata, phase: 'sending' }); setPendingId(metadata.requestId);
     handle.write({ actorId, studentId, requestId: metadata.requestId }); setBusy(true); setMessage('Estamos guardando el documento. Espera la confirmación.');
     const request = controller(), result = await api.register(studentId, metadata, draft.file!, request.signal); requests.current.delete(request);
@@ -203,14 +204,15 @@ export function StudentConsent({ api, studentId, actorId, snapshot, refresh, lea
   }
   const frozen = busy || Boolean(pendingId), available = Boolean(snapshot) && refresh.status === 'ready';
   const revokeAttempt = draft.operation && 'reason' in draft.operation ? draft.operation : undefined;
+  const validity = consentValidity(snapshot);
   const needsReview = Boolean(!pendingId && (draft.reviewRequired || snapshot && draft.baseVersion !== undefined && draft.baseVersion !== snapshot.consent.version));
   return <section className="rounded-xl border border-border bg-white p-5 sm:p-8" aria-labelledby="consent-title">
     <header className="flex flex-wrap items-start justify-between gap-4"><div><h2 id="consent-title" className="text-xl font-semibold">Consentimiento informado</h2>
       <p className="mt-2 max-w-2xl text-sm text-muted">Registra el documento firmado por el acudiente. Al confirmar el guardado, el estudiante se activa automáticamente; no necesitas otro botón de activación.</p></div>
-      <span className="account-status">{refresh.status === 'checking' ? 'Comprobando…' : !available ? 'No se pudo comprobar' : snapshot!.consent.state === 'NONE' ? 'Sin registro' : snapshot!.consent.state === 'CURRENT' ? 'Vigente' : 'Revocado'}</span>
+      <span className="account-status">{refresh.status === 'checking' ? 'Comprobando…' : !available ? 'No se pudo comprobar' : snapshot!.consent.state === 'NONE' ? 'Sin registro' : snapshot!.consent.state === 'CURRENT' ? (validity?.expired ? 'Vencido' : 'Vigente') : 'Revocado'}</span>
     </header>
     <Button className="mt-4" variant="outline" disabled={refresh.status === 'checking'} onClick={recheck}>Actualizar estado</Button>
-    {available && <p className="mt-4" role="status">Estado actual del estudiante: <strong>{snapshot!.student.isActive ? 'Activo' : 'Inactivo'}</strong>. {snapshot!.consent.state === 'NONE' ? 'Aún no tiene consentimiento registrado.' : snapshot!.consent.state === 'REVOKED' ? 'El consentimiento fue revocado. Necesita uno nuevo para iniciar actividades.' : 'Tiene consentimiento vigente.'}</p>}
+    {available && <p className="mt-4" role="status">Estado actual del estudiante: <strong>{snapshot!.student.isActive ? 'Activo' : 'Inactivo'}</strong>. {snapshot!.consent.state === 'NONE' ? 'Aún no tiene consentimiento registrado.' : snapshot!.consent.state === 'REVOKED' ? 'El consentimiento fue revocado. Necesita uno nuevo para iniciar actividades.' : validity?.expired ? `El consentimiento venció el ${longDate(validity.until!)}. Registra el documento del nuevo año escolar para que pueda jugar.` : validity?.until ? `Tiene consentimiento vigente hasta el ${longDate(validity.until)}.` : 'Tiene consentimiento vigente hasta el fin del año escolar del curso.'}</p>}
     {!available && <p className="mt-5">Necesitamos comprobar la información antes de guardar. Pulsa Actualizar estado. Conservamos lo que completaste mientras mantengas acceso.</p>}
     <p id="consent-result" ref={summary} tabIndex={-1} role={feedback?.message === message ? undefined : 'status'} className="mt-5 text-sm empty:hidden">{message}</p>
     {pendingId && <div className="mt-4 rounded-lg border border-border p-4"><h3 className="font-semibold">Guardado por confirmar</h3><p className="mt-1 text-sm">Primero comprobaremos si se guardó para evitar duplicados. Si recargaste la página y podemos continuar el envío, te pediremos que selecciones otra vez el documento original.</p><Button className="mt-3" variant="outline" disabled={busy} onClick={() => void reconcile()}>Comprobar si se guardó</Button>
@@ -231,6 +233,11 @@ export function StudentConsent({ api, studentId, actorId, snapshot, refresh, lea
       <div className="grid gap-5 sm:grid-cols-2">{(['signedOn', 'receivedOn'] as const).map(field => <div key={field} className="space-y-2"><Label htmlFor={`consent-${field}`}>{field === 'signedOn' ? 'Fecha de firma' : 'Fecha de recepción'}</Label>
         <Input id={`consent-${field}`} type="date" required className="scroll-mt-6 aria-invalid:border-foreground" value={draft[field]} disabled={frozen} aria-invalid={Boolean(errors[field])} aria-describedby={`consent-${field}-error consent-date-help`} onChange={event => editRegistration({ ...currentDraft.current, [field]: event.target.value }, field)} />
         <p id={`consent-${field}-error`} className="text-sm font-semibold empty:hidden">{errors[field]}</p></div>)}</div>
+      <div className="space-y-2 max-w-xs"><Label htmlFor="consent-validUntil">Vigente hasta (opcional)</Label>
+        <Input id="consent-validUntil" type="date" className="scroll-mt-6 aria-invalid:border-foreground" value={draft.validUntil ?? ''} disabled={frozen} min={draft.receivedOn || undefined} aria-invalid={Boolean(errors.validUntil)} aria-describedby="consent-validUntil-help consent-validUntil-error"
+          onChange={event => { update({ ...currentDraft.current, validUntil: event.target.value || undefined }); setErrors(old => ({ ...old, validUntil: '' })); }} />
+        <p id="consent-validUntil-help" className="text-sm text-muted">El consentimiento aplica a un solo año escolar. Si lo dejas vacío, vale hasta el 31 de diciembre del año del curso.</p>
+        <p id="consent-validUntil-error" className="text-sm font-semibold empty:hidden">{errors.validUntil}</p></div>
       <p id="consent-date-help" className="text-sm text-muted">Indica cuándo firmó el acudiente y cuándo recibiste el documento. Ninguna fecha puede ser posterior a hoy en Colombia; la firma no puede ser posterior a la recepción.</p>
       {errors.operation && <p>{errors.operation}</p>}
       {needsReview && <div role="status" className="space-y-3"><p>El consentimiento cambió mientras preparabas este documento. Revisa el estado y el historial antes de continuar.</p><Button type="button" variant="outline" disabled={!available} onClick={() => { update({ ...draft, baseVersion: snapshot!.consent.version, reviewRequired: false }); setErrors({}); }}>He revisado el estado actual</Button></div>}
@@ -265,7 +272,7 @@ export function StudentConsent({ api, studentId, actorId, snapshot, refresh, lea
       <ol className="mt-4 divide-y divide-border">{events.map(event => <li key={event.id} className="flex flex-wrap items-start justify-between gap-4 py-4">
         <div className="min-w-0 space-y-1"><p className="font-medium">{event.type === 'REGISTER' ? 'Registro inicial' : event.type === 'REPLACE' ? 'Nuevo documento' : 'Revocación'} · Registro {event.version}</p>
           <p className="text-sm [overflow-wrap:anywhere]">{event.author.name} · {new Date(event.occurredAt).toLocaleString('es-CO', { timeZone: 'America/Bogota' })} (Colombia)</p>
-           <p className="text-sm text-muted">Firma: {event.record.signedOn} · Recepción: {event.record.receivedOn}</p>
+           <p className="text-sm text-muted">Firma: {event.record.signedOn} · Recepción: {event.record.receivedOn}{event.record.validUntil ? ` · Vigente hasta: ${event.record.validUntil}` : ''}</p>
            {event.reason && <p className="max-w-2xl whitespace-pre-wrap [overflow-wrap:anywhere]">Motivo: {event.reason}</p>}</div>
         <Button type="button" variant="outline" onClick={() => void download(event.record.id)} aria-label={`Descargar documento del registro ${event.version}`}><Download aria-hidden="true" className="size-4" />Descargar</Button>
       </li>)}</ol>

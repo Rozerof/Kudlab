@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { MAX_CONSENT_FILE_BYTES } from './consent-storage.js';
 
-type MetadataField = 'metadata' | 'requestId' | 'expectedVersion' | 'signedOn' | 'receivedOn' | 'file' | 'reason' | 'recordId';
-type MetadataReason = 'required' | 'invalid_format' | 'future_date' | 'date_order' | 'too_large';
+type MetadataField = 'metadata' | 'requestId' | 'expectedVersion' | 'signedOn' | 'receivedOn' | 'validUntil' | 'file' | 'reason' | 'recordId';
+type MetadataReason = 'required' | 'invalid_format' | 'future_date' | 'date_order' | 'too_large' | 'past_date' | 'school_year';
 export class ConsentInputError extends Error {
   readonly code = 'INVALID_INPUT';
   constructor(readonly fields: { field: MetadataField; reason: MetadataReason }[], readonly status: 400 | 413 = 400) {
@@ -13,7 +13,7 @@ export class ConsentInputError extends Error {
 const invalid = (field: MetadataField, reason: MetadataReason = 'invalid_format') =>
   new ConsentInputError([{ field, reason }]);
 const metadataSchema = z.strictObject({ requestId: z.uuid(), expectedVersion: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
-  signedOn: z.string(), receivedOn: z.string() });
+  signedOn: z.string(), receivedOn: z.string(), validUntil: z.string().optional() });
 const revocationSchema = z.strictObject({ requestId: z.uuid(), expectedVersion: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
   recordId: z.uuid(), reason: z.string().trim().min(1).max(2000) });
 export function parseConsentRevocation(input: unknown) {
@@ -56,7 +56,7 @@ export function parseConsentMetadata(input: unknown, now: Date) {
   if (!parsed.success) {
     const fields = parsed.error.issues.map(issue => {
       const key = issue.path[0];
-      const field: MetadataField = key === 'requestId' || key === 'expectedVersion' || key === 'signedOn' || key === 'receivedOn' ? key : 'metadata';
+      const field: MetadataField = key === 'requestId' || key === 'expectedVersion' || key === 'signedOn' || key === 'receivedOn' || key === 'validUntil' ? key : 'metadata';
       return { field, reason: 'invalid_format' as const };
     });
     throw new ConsentInputError(fields);
@@ -71,6 +71,11 @@ export function parseConsentMetadata(input: unknown, now: Date) {
     if (data[field] > today) throw invalid(field, 'future_date');
   }
   if (data.signedOn > data.receivedOn) throw invalid('signedOn', 'date_order');
+  if (data.validUntil !== undefined) {
+    if (!realDate(data.validUntil)) throw invalid('validUntil');
+    if (data.validUntil < data.receivedOn) throw invalid('validUntil', 'date_order');
+    if (data.validUntil < today) throw invalid('validUntil', 'past_date');
+  }
   return data;
 }
 

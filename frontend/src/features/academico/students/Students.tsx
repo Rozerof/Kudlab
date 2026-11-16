@@ -3,6 +3,7 @@ import { StudentConsent } from '../consents/StudentConsent';
 import { operationHandle } from '../consents/operation-handle.ts';
 import type { ConsentsApi } from '../consents/api.ts';
 import type { ConsentSnapshot } from '../consents/types.ts';
+import { consentValidity } from '../consents/types.ts';
 import type { DraftLease, StudentDraftHost, StudentRefresh } from './student-drafts.ts';
 import type { FormEvent, ReactNode } from 'react';
 import { ArrowLeft } from 'lucide-react';
@@ -177,7 +178,7 @@ export function StudentDetail({ api, readApi, activities, consents, observations
       </Notice>}
       {refresh.status !== 'ready' && <p role="status">{query.fetching ? 'Comprobando el estado actual…' : 'La ficha no está actualizada. Las escrituras esperan una nueva comprobación.'}</p>}
       <StudentIndicatorsLink student={student} />
-      <Section title="Consentimiento informado" hint={snapshot?.consent.state === 'CURRENT' ? 'Vigente' : snapshot?.consent.state === 'REVOKED' ? 'Revocado' : 'Pendiente'} open={snapshot !== undefined && snapshot.consent.state !== 'CURRENT'}>
+      <Section title="Consentimiento informado" hint={snapshot?.consent.state === 'CURRENT' ? (consentValidity(snapshot)?.expired ? 'Vencido' : 'Vigente') : snapshot?.consent.state === 'REVOKED' ? 'Revocado' : 'Pendiente'} open={snapshot !== undefined && (snapshot.consent.state !== 'CURRENT' || Boolean(consentValidity(snapshot)?.expired))}>
       {lease && <StudentConsent key={`${apiOrigin}:${actorId}:${student.id}:${student.groupId}`} api={consents} studentId={studentId} actorId={actorId} snapshot={snapshot} refresh={refresh} lease={lease} recheck={recheckSelection}
         onChange={change => { if (activeSequence === sequence.current && lease.valid() && change.studentId === studentId) query.reload(); }} />}
       </Section>

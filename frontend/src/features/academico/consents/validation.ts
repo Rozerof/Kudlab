@@ -4,6 +4,9 @@ import { fieldMessages } from './types.ts';
 export const registrationFields = ['file', 'signedOn', 'receivedOn'] as const;
 const labels: Record<string, string> = { file: 'Documento firmado', signedOn: 'Fecha de firma', receivedOn: 'Fecha de recepción' };
 export function consentFieldMessage(field: string, reason: string) {
+  if (field === 'validUntil') return reason === 'date_order' ? 'Vigencia: debe ser igual o posterior a la fecha de recepción.'
+    : reason === 'past_date' ? 'Vigencia: esa fecha ya pasó; el documento no quedaría vigente.'
+    : reason === 'school_year' ? 'Vigencia: el consentimiento aplica a un solo año escolar; usa una fecha del año del curso.' : 'Vigencia: revisa la fecha.';
   if (reason === 'required') {
     if (field === 'file') return 'Selecciona un documento firmado.';
     if (field === 'signedOn') return 'Indica la fecha de firma.';

@@ -148,6 +148,13 @@
       "when": 1794802212042,
       "tag": "0020_aula_observacion",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794807689284,
+      "tag": "0021_consent_vigencia",
+      "breakpoints": true
     }
   ]
 }

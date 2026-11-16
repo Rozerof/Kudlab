@@ -1,20 +1,20 @@
 import { isUuid, parseStudent } from '../students/types.ts';
 import type { Student } from '../students/types.ts';
 
-export type ConsentRecord = { id: string; signedOn: string; receivedOn: string; mediaType: string; byteSize: number; sha256: string };
+export type ConsentRecord = { id: string; signedOn: string; receivedOn: string; validUntil: string | null; mediaType: string; byteSize: number; sha256: string };
 export type ConsentSnapshot = { student: Student; consent: { state: 'NONE' | 'CURRENT' | 'REVOKED'; version: number; currentRecord: ConsentRecord | null }; evaluatedAt: string };
 export type ConsentAck = { requestId: string; eventId: string; recordId: string; version: number; confirmedAt: string; repeated: boolean };
 export type ConsentEvent = { id: string; type: 'REGISTER' | 'REPLACE' | 'REVOKE'; version: number; record: ConsentRecord; previousRecordId: string | null;
   author: { id: string; name: string }; occurredAt: string; reason: string | null };
 export type ConsentHistory = { items: ConsentEvent[]; nextCursor: string | null };
-export type ConsentMetadata = { requestId: string; expectedVersion: number; signedOn: string; receivedOn: string };
+export type ConsentMetadata = { requestId: string; expectedVersion: number; signedOn: string; receivedOn: string; validUntil?: string };
 export type ConsentRevocation = { requestId: string; expectedVersion: number; recordId: string; reason: string };
 export type ConsentOperation = { requestId: string; action: 'REGISTER' | 'REVOKE'; status: 'PENDING' | 'COMMITTED' | 'REJECTED'; acknowledgement: ConsentAck | null;
   attempt: { expectedVersion: number; signedOn: string | null; receivedOn: string | null; mediaType: string | null; byteSize: number | null; sha256: string | null }; rejectionCode: string | null };
-export type ConsentDraft = { signedOn: string; receivedOn: string; file?: File; baseVersion?: number; reviewRequired?: boolean;
+export type ConsentDraft = { signedOn: string; receivedOn: string; validUntil?: string; file?: File; baseVersion?: number; reviewRequired?: boolean;
   revocation?: Omit<ConsentRevocation, 'requestId'>; operation?: ConsentMetadata | ConsentRevocation;
   phase?: 'sending' | 'uncertain' | 'retry'; focus?: string };
-export type ConsentField = 'file' | 'signedOn' | 'receivedOn' | 'metadata' | 'requestId' | 'expectedVersion' | 'operation' | 'reason' | 'recordId';
+export type ConsentField = 'file' | 'signedOn' | 'receivedOn' | 'validUntil' | 'metadata' | 'requestId' | 'expectedVersion' | 'operation' | 'reason' | 'recordId';
 const object = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
 const integer = (v: unknown): v is number => Number.isSafeInteger(v) && Number(v) >= 0;
 const date = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v;
@@ -24,7 +24,9 @@ const hash = (v: unknown): v is string => typeof v === 'string' && /^[a-f0-9]{64
 export function parseRecord(v: unknown): ConsentRecord | undefined {
   if (!object(v) || !isUuid(v.id) || !date(v.signedOn) || !date(v.receivedOn) || v.signedOn > v.receivedOn || !mime(v.mediaType) ||
     !integer(v.byteSize) || v.byteSize < 1 || v.byteSize > 10485760 || !hash(v.sha256)) return;
-  return { id: v.id, signedOn: v.signedOn, receivedOn: v.receivedOn, mediaType: v.mediaType, byteSize: v.byteSize, sha256: v.sha256 };
+  const validUntil = v.validUntil === undefined || v.validUntil === null ? null : date(v.validUntil) ? v.validUntil : undefined;
+  if (validUntil === undefined) return;
+  return { id: v.id, signedOn: v.signedOn, receivedOn: v.receivedOn, validUntil, mediaType: v.mediaType, byteSize: v.byteSize, sha256: v.sha256 };
 }
 export function parseSnapshot(v: unknown): ConsentSnapshot | undefined {
   if (!object(v) || !object(v.consent) || !instant(v.evaluatedAt)) return;
@@ -76,7 +78,20 @@ export function decodeConsentFields(v: unknown): { field: ConsentField; reason: 
   return v.fields.flatMap(item => {
     if (!object(item) || typeof item.field !== 'string' || typeof item.reason !== 'string') return [];
     const conflict = item.field === 'operation' && v.code === 'CONFLICT' && ['STALE_VERSION', 'REQUEST_REUSED', 'NOT_CURRENT', 'EVIDENCE_MISMATCH'].includes(item.reason);
-    const input = v.code === 'INVALID_INPUT' && ['file', 'signedOn', 'receivedOn', 'metadata', 'requestId', 'expectedVersion', 'reason', 'recordId'].includes(item.field) && ['required', 'invalid_format', 'too_large', 'future_date', 'date_order'].includes(item.reason);
+    const input = v.code === 'INVALID_INPUT' && ['file', 'signedOn', 'receivedOn', 'validUntil', 'metadata', 'requestId', 'expectedVersion', 'reason', 'recordId'].includes(item.field) && ['required', 'invalid_format', 'too_large', 'future_date', 'date_order', 'past_date', 'school_year'].includes(item.reason);
     return conflict || input ? [{ field: item.field as ConsentField, reason: item.reason }] : [];
   });
+}
+
+// Vigencia del consentimiento (un año escolar). Sin fecha registrada: vale hasta el fin del año escolar del curso.
+export function bogotaToday(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+  const part = (type: string) => parts.find(p => p.type === type)!.value;
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+export const longDate = (value: string) => new Date(`${value}T12:00:00Z`).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+export function consentValidity(snapshot: ConsentSnapshot | undefined) {
+  const record = snapshot?.consent.state === 'CURRENT' ? snapshot.consent.currentRecord : null;
+  if (!record) return undefined;
+  return { until: record.validUntil, expired: record.validUntil !== null && record.validUntil < bogotaToday() };
 }

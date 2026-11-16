@@ -40,7 +40,7 @@ async function ownStudent(tx: AcademicTransaction, actor: AcademicActor, id: str
   return student;
 }
 function recordDto(row: RecordRow) {
-  return { id: row.id, signedOn: row.signedOn, receivedOn: row.receivedOn, mediaType: row.mediaType,
+  return { id: row.id, signedOn: row.signedOn, receivedOn: row.receivedOn, validUntil: row.validUntil, mediaType: row.mediaType,
     byteSize: row.byteSize, sha256: row.sha256 };
 }
 async function latest(tx: AcademicTransaction, studentId: string) {
@@ -72,15 +72,22 @@ export function getConsentSnapshot(actor: AcademicActor, studentId: string) {
 }
 export async function registerConsent(actor: AcademicActor, studentId: string, request: Request, dependencies: ConsentDependencies) {
   // Authorize before receiving any document; no database locks are held during validation or storage.
-  await withAcademicAccess(actor, tx => ownStudent(tx, actor, studentId, true));
-  const { file, metadata } = await readConsentForm(request, new Date());
+  const schoolYear = await withAcademicAccess(actor, async tx => {
+    const student = await ownStudent(tx, actor, studentId, true);
+    const [group] = await tx.select({ year: groups.schoolYear }).from(groups).where(eq(groups.id, student.groupId));
+    return group!.year;
+  });
+  const { file, metadata: parsed } = await readConsentForm(request, new Date());
+  // El consentimiento aplica a un solo año escolar: por defecto hasta el 31 de diciembre del año del curso, nunca después.
+  const metadata = { ...parsed, validUntil: parsed.validUntil ?? `${schoolYear}-12-31` };
+  if (!metadata.validUntil.startsWith(`${schoolYear}-`)) throw new ConsentInputError([{ field: 'validUntil', reason: 'school_year' }]);
   const validation = await dependencies.validate(file, request.signal);
   if (validation.kind === 'unavailable') throw consentUnavailable();
   if (validation.kind !== 'valid') throw new ConsentInputError([{ field: 'file', reason: 'invalid_format' }]);
   const bytes = Buffer.from(await file.arrayBuffer());
   const recordId = randomUUID(), evidence = describeConsentEvidence(recordId, bytes, validation.mediaType);
   const fingerprint = createHash('sha256').update(JSON.stringify([studentId, 'REGISTER', metadata.expectedVersion,
-    metadata.signedOn, metadata.receivedOn, evidence.mediaType, evidence.byteSize, evidence.sha256])).digest('hex');
+    metadata.signedOn, metadata.receivedOn, evidence.mediaType, evidence.byteSize, evidence.sha256, metadata.validUntil])).digest('hex');
   const operation = await withAcademicAccess(actor, async tx => {
     await ownStudent(tx, actor, studentId, true);
     const [prior] = await tx.select().from(consentOperations)
@@ -92,7 +99,7 @@ export async function registerConsent(actor: AcademicActor, studentId: string, r
     if (((await latest(tx, studentId))?.version ?? 0) !== metadata.expectedVersion) throw consentConflict('STALE_VERSION');
     const [created] = await tx.insert(consentOperations).values({ actorId: actor.accountId, studentId, requestId: metadata.requestId,
       action: 'REGISTER', expectedVersion: metadata.expectedVersion, fingerprint, recordId,
-      signedOn: metadata.signedOn, receivedOn: metadata.receivedOn, ...evidence })
+      signedOn: metadata.signedOn, receivedOn: metadata.receivedOn, validUntil: metadata.validUntil, ...evidence })
       .onConflictDoNothing({ target: [consentOperations.actorId, consentOperations.requestId] }).returning();
     if (created) return created;
     const [concurrent] = await tx.select().from(consentOperations)
@@ -117,7 +124,7 @@ export async function registerConsent(actor: AcademicActor, studentId: string, r
     const [author] = await tx.select({ name: userAccounts.fullName }).from(userAccounts).where(eq(userAccounts.id, actor.accountId));
     if (!author || !current.signedOn || !current.receivedOn) throw consentUnavailable();
     await tx.insert(consentRecords).values({ id: current.recordId, studentId,
-      signedOn: current.signedOn, receivedOn: current.receivedOn, ...operationEvidence(current) });
+      signedOn: current.signedOn, receivedOn: current.receivedOn, validUntil: current.validUntil, ...operationEvidence(current) });
     const [event] = await tx.insert(consentEvents).values({ studentId, recordId: current.recordId, version: current.expectedVersion + 1,
       type: previous ? 'REPLACE' : 'REGISTER', previousRecordId: previous?.recordId ?? null, actorId: actor.accountId, actorName: author.name }).returning();
     [student] = await tx.update(students).set({ isActive: true }).where(eq(students.id, studentId)).returning() as [typeof students.$inferSelect];

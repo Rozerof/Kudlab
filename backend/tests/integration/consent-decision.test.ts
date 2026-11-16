@@ -16,7 +16,7 @@ it('CA-03/04/07: complete course batch, no truncation, missing/foreign/duplicate
   await db.insert(consentRecords).values({ id: recordId, studentId: rows[0]!.id, signedOn: '2026-01-01', receivedOn: '2026-01-01', objectKey: `consents/${recordId}`, mediaType: 'image/png', byteSize: 1, sha256: 'a'.repeat(64) });
   await db.insert(consentEvents).values({ studentId: rows[0]!.id, recordId, version: 1, type: 'REGISTER', actorId: f.a.account.id, actorName: 'Docente ficticio' });
   await db.transaction(async tx => {
-    expect(await readConsentDecision(tx, rows[0]!.id, at)).toEqual({ kind: 'available', state: 'CURRENT', version: 1, authorizationReference: `CONSENT:${recordId}`, validUntil: null });
+    expect(await readConsentDecision(tx, rows[0]!.id, at)).toEqual({ kind: 'available', state: 'CURRENT', version: 1, authorizationReference: `CONSENT:${recordId}`, validUntil: new Date(`${f.aGroups[0]!.schoolYear}-12-31T23:59:59.999-05:00`) });
     expect(await readConsentDecision(tx, rows[1]!.id, at)).toEqual({ kind: 'available', state: 'NONE', version: 0 });
     const batch = await readConsentDecisions(tx, f.aGroups[0]!.id, rows.map(r => r.id), at);
     expect(batch.kind).toBe('complete');
