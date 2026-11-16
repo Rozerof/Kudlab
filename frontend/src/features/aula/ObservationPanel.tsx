@@ -134,6 +134,7 @@ function PanelSummary({ data }: { data: PanelList }) {
   }, [periods, data.games]);
   if (!periods.length) return <p className="text-sm text-muted">Aún no hay observaciones registradas con el panel 0–5.</p>;
   return <div className="staff-stack">
+    {periods.length >= 2 && <PanelLines periods={periods} />}
     <div className="staff-table-region" role="region" aria-label="Resumen del panel por bloque y periodo" tabIndex={0}>
       <table className="panel-summary"><thead><tr><th scope="col">Bloque</th>{periods.map(p => <th key={p.period} scope="col">{p.period.replace('-P', ' P')}</th>)}<th scope="col">Juego relacionado (última partida)</th></tr></thead>
         <tbody>{(Object.keys(BLOCK_SHORT) as BlockKey[]).map(b => <tr key={b}><th scope="row">{BLOCK_SHORT[b]}</th>{periods.map(p => {
@@ -144,4 +145,30 @@ function PanelSummary({ data }: { data: PanelList }) {
     {text && <p className="text-sm panel-support">{text}</p>}
     <p className="text-xs text-muted">La observación se lee junto al indicador del juego, nunca en lugar de él. Promedio por bloque (0 a 5) del registro más reciente de cada periodo. Un bloque se muestra con al menos 2 respuestas (el E, con 1). Sin puntaje global ni comparación entre estudiantes.</p>
   </div>;
+}
+
+// Línea de tiempo por periodo (un solo tono neutro; cada bloque se distingue por trazo y etiqueta, no por color).
+const DASH: Record<BlockKey, string> = { A: '', B: '6 4', C: '2 4', D: '10 4 2 4', E: '1 6' };
+function PanelLines({ periods }: { periods: PanelList['periods'] }) {
+  const w = 560, h = 220, left = 36, right = 120, top = 14, bottom = 30;
+  const x = (i: number) => left + (periods.length === 1 ? 0 : i * (w - left - right) / (periods.length - 1));
+  const y = (v: number) => top + (5 - v) * (h - top - bottom) / 5;
+  const blocks = Object.keys(BLOCK_SHORT) as BlockKey[];
+  return <figure className="panel-lines">
+    <svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label="Promedio por bloque en cada periodo, de 0 a 5">
+      {[0, 1, 2, 3, 4, 5].map(v => <g key={v}><line x1={left} x2={w - right} y1={y(v)} y2={y(v)} stroke="#e3e8ef" /><text x={left - 8} y={y(v) + 4} textAnchor="end" fontSize="11" fill="#5b6b80">{v}</text></g>)}
+      {periods.map((p, i) => <text key={p.period} x={x(i)} y={h - 8} textAnchor="middle" fontSize="11" fill="#5b6b80">{p.period.replace('-P', ' P')}</text>)}
+      {(() => {
+        const series = blocks.map(b => ({ b, pts: periods.map((p, i) => [i, p.blocks[b].average] as const).filter((q): q is readonly [number, number] => q[1] !== null) })).filter(x => x.pts.length);
+        // Etiquetas al final de cada línea, separadas para que no se encimen cuando los promedios coinciden.
+        const labels = series.map(sr => ({ b: sr.b, x: x(sr.pts[sr.pts.length - 1]![0]) + 10, y: y(sr.pts[sr.pts.length - 1]![1]) + 4 })).sort((p, q) => p.y - q.y);
+        for (let i = 1; i < labels.length; i++) if (labels[i]!.y - labels[i - 1]!.y < 13) labels[i]!.y = labels[i - 1]!.y + 13;
+        return <>{series.map(({ b, pts }) => <g key={b}>
+          <polyline points={pts.map(([i, v]) => `${x(i)},${y(v)}`).join(' ')} fill="none" stroke="#3c5470" strokeWidth="2" strokeDasharray={DASH[b]} />
+          {pts.map(([i, v]) => <circle key={i} cx={x(i)} cy={y(v)} r="3.5" fill="#fff" stroke="#3c5470" strokeWidth="2" />)}
+        </g>)}{labels.map(l => <text key={l.b} x={l.x} y={l.y} fontSize="11" fill="#1f2d3d">{BLOCK_SHORT[l.b]}</text>)}</>;
+      })()}
+    </svg>
+    <figcaption className="text-xs text-muted">Cada línea es un bloque; los puntos vacíos en la tabla significan datos insuficientes y no se dibujan.</figcaption>
+  </figure>;
 }

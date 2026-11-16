@@ -116,6 +116,7 @@ export function createGameRoutes(deps: GameDependencies = {}) {
   for (const path of ['/task-assignments', '/task-assignments/*', '/task-assignment-recipients/*', '/task-access-codes/*', '/task-sessions/*', '/students/:id/task-sessions', '/students/:id/task-assignments', '/students/:id/play-profile', '/groups/:id/aula', '/groups/:id/aula/*']) teacher.use(path, protect);
   teacher.put('/students/:id/play-profile', async c => { empty(c); return c.json(await service.setPlayProfile(academicActor(c), c.req.param('id'), await body(c, 4096))); });
   teacher.get('/groups/:id/aula', async c => { empty(c); return c.json(await service.aula(academicActor(c), c.req.param('id'))); });
+  teacher.post('/groups/:id/aula/auto-profiles', async c => { empty(c); return c.json(await service.autoProfiles(academicActor(c), c.req.param('id'), await body(c, 4096))); });
   teacher.post('/groups/:id/aula/open', async c => { empty(c); return c.json(await service.openClass(academicActor(c), c.req.param('id'), await body(c, 4096))); });
   teacher.post('/groups/:id/aula/close', async c => { empty(c); return c.json(await service.closeClass(academicActor(c), c.req.param('id'), await body(c, 4096))); });
   teacher.post('/groups/:id/aula/activations', async c => { empty(c); return c.json(await service.activateGame(academicActor(c), c.req.param('id'), await body(c, 65536))); });

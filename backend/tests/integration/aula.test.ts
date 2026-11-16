@@ -31,6 +31,11 @@ describe('Modo aula', () => {
     expect(taken).toMatchObject({ status: 409, body: { reason: 'ALIAS_TAKEN' } });
     // El mismo apodo sí puede repetirse en otro curso del docente B.
     expect((await call(`/students/${f.student.id}/play-profile`, { alias: 'Tigre', figure: 3 }, f.b.teacher, 'PUT')).status).toBe(404);
+    // Apodos automáticos: solo a quien no tiene; a partir del seudónimo y sin repetir en el curso.
+    const auto = await call(`/groups/${group}/aula/auto-profiles`, {}, t);
+    expect(auto.body).toMatchObject({ created: 1 });
+    expect(auto.body.students.find((x: { id: string }) => x.id === f.secondStudent.id).alias).toBe('PARTICIPANTE');
+    expect(auto.body.students.find((x: { id: string }) => x.id === f.student.id).alias).toBe('TIGRE');
     expect((await call(`/students/${f.secondStudent.id}/play-profile`, { alias: 'Luna', figure: 5 }, t, 'PUT')).status).toBe(200);
 
     // Clase cerrada: no hay cursos visibles y el apodo no entra.
@@ -86,7 +91,7 @@ describe('Modo aula', () => {
     await call(`/groups/${group}/aula/close`, {}, t);
     expect((await call('/game-runtime/access/aula/games', { ticket: who.body.ticket })).body).toMatchObject({ reason: 'CLASS_CLOSED' });
     const documented = operations(contract).filter(([route]) => route.includes('/aula') || route.endsWith('/play-profile')).map(([, , op]) => op.operationId);
-    expect(documented).toHaveLength(11);
+    expect(documented).toHaveLength(12);
     expect([...covered].filter(id => documented.includes(id)).sort()).toEqual(documented.sort());
   });
 });

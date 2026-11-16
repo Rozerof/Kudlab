@@ -34,7 +34,7 @@ import type { NotesApi } from '../notes/api.ts';
 import type { ObservationsApi } from '../../seguimiento/observations/api.ts';
 import { observationMatrixPath } from '../../seguimiento/observations/navigation.ts';
 import type { AulaApi } from '../../aula/api.ts';
-import { ClassroomMode, PriorityLegend, PriorityStar, StudentPlayAccess, useAliases, usePriority } from '../../aula/Aula';
+import { ClassroomMode, PriorityLegend, PriorityStar, StudentPlayAccess, StudentSummaryButton, useAliases, usePriority } from '../../aula/Aula';
 import { ObservationPanel } from '../../aula/ObservationPanel';
 
 export const studentsPath = '/academico/estudiantes';
@@ -73,7 +73,7 @@ export function Students({ api, group, write, reviewed, aula }: { api: StudentsA
     {group && <CourseBack />}
     <header className="staff-heading"><div className="workspace-page-heading"><Heading>{group?.name ?? 'Estudiantes'}</Heading><p>{group ? `Estudiantes · Grado ${group.grade} · Año ${group.schoolYear}` : 'Consulta y actualiza los registros de tus grupos, incluidos los inactivos.'}</p></div>{group && <Link href={`${groupPath(group.id)}/estudiantes/nuevo`} primary>Registrar estudiante</Link>}</header>
     {group && <div className="staff-actions"><Link href={assignmentPath(group.id)}>Asignaciones de tareas digitales</Link><Link href={observationMatrixPath(group.id)}>Registrar observaciones</Link></div>}
-    {course && <Section title="Modo aula: apodos y juegos activos" open><ClassroomMode api={course.aula} groupId={course.groupId} /></Section>}
+    {course && <Section title="Modo aula: apodos y juegos activos" open><ClassroomMode api={course.aula} groupId={course.groupId} groupName={group?.name} /></Section>}
     {course && <PriorityLegend />}
     {!group && <p className="availability-note">Para registrar estudiantes, selecciona primero un curso en <a href={groupsPath} onClick={navigate}>Mis cursos</a>.</p>}
     {!query.result ? <Loading text="Consultando estudiantes" /> : query.result.kind !== 'success' ? <Failure result={query.result} retry={query.reload} /> : !query.result.data.items.length ?
@@ -177,7 +177,7 @@ export function StudentDetail({ api, readApi, activities, consents, observations
         {checking && !query.fetching && <div className="staff-stack mt-4"><p role="status">Estado confirmado por lectura: {student.isActive ? 'activo' : 'inactivo'}. Revisa también el código y los nombres antes de decidir otro guardado.</p><Button variant="outline" onClick={() => { reviewed(); setChecking(false); }}>Ya revisé el registro</Button></div>}
       </Notice>}
       {refresh.status !== 'ready' && <p role="status">{query.fetching ? 'Comprobando el estado actual…' : 'La ficha no está actualizada. Las escrituras esperan una nueva comprobación.'}</p>}
-      <StudentIndicatorsLink student={student} />
+      <div className="flex flex-wrap items-center gap-3"><StudentIndicatorsLink student={student} />{aula && <StudentSummaryButton api={aula} student={student} groupName={group?.name} />}</div>
       <Section title="Consentimiento informado" hint={snapshot?.consent.state === 'CURRENT' ? (consentValidity(snapshot)?.expired ? 'Vencido' : 'Vigente') : snapshot?.consent.state === 'REVOKED' ? 'Revocado' : 'Pendiente'} open={snapshot !== undefined && (snapshot.consent.state !== 'CURRENT' || Boolean(consentValidity(snapshot)?.expired))}>
       {lease && <StudentConsent key={`${apiOrigin}:${actorId}:${student.id}:${student.groupId}`} api={consents} studentId={studentId} actorId={actorId} snapshot={snapshot} refresh={refresh} lease={lease} recheck={recheckSelection}
         onChange={change => { if (activeSequence === sequence.current && lease.valid() && change.studentId === studentId) query.reload(); }} />}

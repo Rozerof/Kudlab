@@ -34,6 +34,7 @@ export function createAulaApi(http: HttpClient) {
   return {
     classroom(groupId: string, signal: AbortSignal): Promise<AulaResult<Classroom>> { return uuid.test(groupId) ? get(`/api/v1/groups/${groupId}/aula`, signal, classroom) : missing(); },
     open(groupId: string, minutes: number, signal: AbortSignal) { return send(`/api/v1/groups/${groupId}/aula/open`, 'POST', { minutes }, signal, classroom); },
+    autoProfiles(groupId: string, signal: AbortSignal) { return send(`/api/v1/groups/${groupId}/aula/auto-profiles`, 'POST', {}, signal, classroom); },
     close(groupId: string, signal: AbortSignal) { return send(`/api/v1/groups/${groupId}/aula/close`, 'POST', {}, signal, classroom); },
     activate(groupId: string, taskId: TaskId, audience: 'GROUP' | 'STUDENTS', studentIds: string[], signal: AbortSignal, limits: { maxAttempts?: number; until?: string } = {}) {
       return send(`/api/v1/groups/${groupId}/aula/activations`, 'POST', { taskId, audience, studentIds, ...(limits.maxAttempts ? { maxAttempts: limits.maxAttempts } : {}), ...(limits.until ? { until: limits.until } : {}) }, signal, classroom);

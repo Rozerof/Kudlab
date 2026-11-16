@@ -19,7 +19,7 @@ function failureText(r: AulaResult<unknown>) {
 }
 
 // ---------- Modo aula (página del curso) ----------
-export function ClassroomMode({ api, groupId }: { api: AulaApi; groupId: string }) {
+export function ClassroomMode({ api, groupId, groupName }: { api: AulaApi; groupId: string; groupName?: string }) {
   const query = useQuery(signal => api.classroom(groupId, signal), `aula:${groupId}`, true);
   const [data, setData] = useState<Classroom>();
   const [busy, setBusy] = useState(false);
@@ -61,7 +61,9 @@ export function ClassroomMode({ api, groupId }: { api: AulaApi; groupId: string 
     </div>
     {playOrigin() && <p className="text-sm">Los estudiantes abren <a className="staff-link" href={playOrigin()} target="_blank" rel="noreferrer">{playOrigin().replace(/^https?:\/\//, '')}</a>, tocan el curso, escriben su apodo y tocan su figura.</p>}
     <p role="status" className="text-sm font-medium">{message}</p>
-    {withoutAlias.length > 0 && <Notice title={`${withoutAlias.length} ${withoutAlias.length === 1 ? 'estudiante no tiene' : 'estudiantes no tienen'} apodo`}><p>Asígnalo en la ficha de cada estudiante, sección «Acceso a los juegos»: {withoutAlias.map(s => s.displayName).join(', ')}.</p></Notice>}
+    {withoutAlias.length > 0 && <Notice title={`${withoutAlias.length} ${withoutAlias.length === 1 ? 'estudiante no tiene' : 'estudiantes no tienen'} apodo`}><p>Asígnalo en la ficha de cada estudiante, sección «Acceso a los juegos», o deja que Kudlab proponga uno a partir del seudónimo: {withoutAlias.map(s => s.displayName).join(', ')}.</p>
+      <Button className="mt-3" onClick={() => void run(s => api.autoProfiles(groupId, s), 'Apodos y figuras asignados. Puedes cambiarlos en la ficha de cada estudiante.')} disabled={busy}>Proponer apodos y figuras</Button></Notice>}
+    <div className="staff-actions"><Button variant="outline" disabled={!data.students.some(s => s.alias)} onClick={() => printCards(data, groupName)}>Imprimir tarjetas de acceso</Button></div>
     {blocked.length > 0 && <p className="text-sm text-muted">Sin consentimiento vigente no pueden jugar: {blocked.map(s => s.displayName).join(', ')}.</p>}
     <h3 className="font-semibold mt-2">Juegos</h3>
     <ul className="aula-games-list">{data.games.map(game => {
@@ -163,5 +165,76 @@ export function PriorityLegend() {
   return <div className="priority-legend" aria-label="Qué significa la estrella">
     {(Object.keys(PRIORITY) as PriorityLevel[]).map(k => <PriorityStar key={k} compact priority={{ studentId: k, level: k, changes: [], message: k === 'AL_DIA' ? 'Sin cambios que revisar' : k === 'REVISAR' ? 'Algunos indicadores cambiaron' : k === 'PRIORIDAD' ? 'Revisar pronto' : 'Datos insuficientes' }} />)}
     <span className="text-sm text-muted">Prioridad de revisión, no diagnóstico: compara a cada estudiante consigo mismo, nunca con sus compañeros.</span>
+  </div>;
+}
+
+// Tarjetas imprimibles: una por estudiante con apodo y figura secreta. Se imprimen recortables, 8 por hoja carta.
+function printCards(data: Classroom, groupName?: string) {
+  const sheet = document.createElement('div'); sheet.className = 'print-sheet'; sheet.setAttribute('aria-hidden', 'true');
+  const url = playOrigin().replace(/^https?:\/\//, '');
+  for (const s of data.students.filter(x => x.alias)) {
+    const card = document.createElement('section'); card.className = 'print-card';
+    const fig = s.figure === null ? undefined : FIGURES[s.figure];
+    const add = (tag: string, cls: string, text: string) => { const n = document.createElement(tag); n.className = cls; n.textContent = text; card.append(n); };
+    add('p', 'print-card-brand', 'Kudlab Play'); add('p', 'print-card-course', groupName ? `Curso ${groupName}` : 'Mi curso');
+    add('p', 'print-card-label', 'Mi apodo'); add('p', 'print-card-alias', s.alias!);
+    add('p', 'print-card-label', 'Mi figura secreta'); add('p', 'print-card-figure', fig ? `${fig[0]} ${fig[1]}` : '—');
+    add('p', 'print-card-name', s.displayName); if (url) add('p', 'print-card-url', `Entra en ${url}`);
+    add('p', 'print-card-note', 'No le muestres tu figura secreta a nadie.');
+    sheet.append(card);
+  }
+  document.body.append(sheet);
+  const done = () => { sheet.remove(); window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  window.print();
+  setTimeout(() => { if (sheet.isConnected && !window.matchMedia('print').matches) done(); }, 60000);
+}
+
+// Ficha resumen imprimible / PDF (el navegador ofrece «Guardar como PDF»). Solo lectura, con aviso de no diagnóstico.
+const BLOCK_NAMES = { A: 'A · Atención sostenida', B: 'B · Atención selectiva', C: 'C · Memoria de trabajo', D: 'D · Memoria de secuencias', E: 'E · Persistencia' } as const;
+export function StudentSummaryButton({ api, student, groupName }: { api: AulaApi; student: { id: string; groupId: string; firstName: string; lastName: string; studentCode: string }; groupName?: string }) {
+  const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle');
+  async function open() {
+    setState('loading');
+    const signal = AbortSignal.timeout(15000);
+    const [panels, priority, room] = await Promise.all([api.panels(student.id, signal), api.priority(student.groupId, signal), api.classroom(student.groupId, signal)]);
+    if (panels.kind !== 'success') { setState('error'); return; }
+    setState('idle');
+    const star = priority.kind === 'success' ? priority.data.items.find(i => i.studentId === student.id) : undefined;
+    const me = room.kind === 'success' ? room.data.students.find(s => s.id === student.id) : undefined;
+    const sheet = document.createElement('div'); sheet.className = 'print-sheet print-report'; sheet.setAttribute('aria-hidden', 'true');
+    const el = (tag: string, text = '', cls = '') => { const n = document.createElement(tag); if (cls) n.className = cls; n.textContent = text; return n; };
+    sheet.append(el('p', 'Kudlab · Ficha resumen del estudiante', 'report-brand'), el('h1', `${student.firstName} ${student.lastName}`),
+      el('p', `Código ${student.studentCode}${groupName ? ` · Curso ${groupName}` : ''}${me?.alias ? ` · Apodo ${me.alias}` : ''} · Generada el ${new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}`, 'report-meta'));
+    sheet.append(el('h2', 'Prioridad de revisión'));
+    sheet.append(el('p', star ? `${PRIORITY[star.level].label}: ${star.message}` : 'Sin información.'));
+    if (star && star.changes.length > 1) { sheet.append(el('h3', 'Cambios detectados (el estudiante comparado consigo mismo)')); const ul = el('ul'); for (const c of star.changes) ul.append(el('li', c)); sheet.append(ul); }
+    sheet.append(el('h2', 'Panel de observación docente (0 a 5)'));
+    const periods = panels.data.periods;
+    if (!periods.length) sheet.append(el('p', 'Aún no hay observaciones registradas.'));
+    else {
+      const table = el('table'), head = el('tr'); head.append(el('th', 'Bloque'), ...periods.map(p => el('th', p.period.replace('-P', ' P'))), el('th', 'Juego relacionado (última partida)'));
+      table.append(head);
+      for (const b of Object.keys(BLOCK_NAMES) as (keyof typeof BLOCK_NAMES)[]) {
+        const tr = el('tr'); tr.append(el('td', BLOCK_NAMES[b]));
+        for (const p of periods) { const v = p.blocks[b]; tr.append(el('td', v.status === 'OK' && v.average !== null ? v.average.toLocaleString('es-CO', { minimumFractionDigits: 1 }) : 'Datos insuficientes')); }
+        const g = panels.data.games?.[b];
+        tr.append(el('td', g ? `${g.title}: ${g.label} ${g.unit === '%' ? `${g.value.toLocaleString('es-CO', { maximumFractionDigits: 1 })} %` : `${Math.round(g.value)} elementos`}` : b === 'E' ? 'Transversal' : 'Sin partidas'));
+        table.append(tr);
+      }
+      sheet.append(table);
+      const notes = panels.data.items[0]?.notes ?? {};
+      const list = Object.entries(notes).filter(([, v]) => v);
+      if (list.length) { sheet.append(el('h3', 'Notas del registro más reciente')); const ul = el('ul'); for (const [k, v] of list) ul.append(el('li', `Bloque ${k}: ${v}`)); sheet.append(ul); }
+    }
+    sheet.append(el('p', 'Información pedagógica complementaria. Describe conductas observables y desempeños en actividades; no constituye un diagnóstico clínico, no clasifica al estudiante y no lo compara con sus compañeros.', 'report-notice'));
+    document.body.append(sheet);
+    const done = () => { sheet.remove(); window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done);
+    window.print();
+  }
+  return <div className="flex flex-wrap items-center gap-3">
+    <Button variant="outline" onClick={() => void open()} disabled={state === 'loading'}>{state === 'loading' ? 'Preparando ficha…' : 'Ficha resumen (PDF)'}</Button>
+    {state === 'error' && <span role="status" className="text-sm">No pudimos preparar la ficha. Vuelve a intentarlo.</span>}
   </div>;
 }

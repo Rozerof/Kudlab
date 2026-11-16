@@ -4892,6 +4892,25 @@ paths:
         '404': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
         '409': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
         '503': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+  /api/v1/groups/{id}/aula/auto-profiles:
+    parameters:
+      - { name: id, in: path, required: true, description: Identificador del recurso., schema: { type: string } }
+    post:
+      operationId: autoAssignPlayProfiles
+      summary: Proponer apodos y figuras
+      description: >-
+        A los estudiantes activos del curso que aún no tienen apodo les asigna uno a partir de su seudónimo (sin repetir en el curso) y una figura al azar. No cambia los que ya existen; la docente puede editarlos en la ficha.
+      tags: [ Accesos ]
+      security: *session
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: Respuesta confirmada; no-store., content: { application/json: { schema: { type: object } } } }
+        '400': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '401': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '403': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '404': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '409': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '503': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
   /api/v1/groups/{id}/aula/open:
     parameters:
       - { name: id, in: path, required: true, description: Identificador del recurso., schema: { type: string } }

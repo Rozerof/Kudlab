@@ -22,7 +22,7 @@ import { accessDigest, accessSettings, codeInput, newCode, openCode, sealCode } 
 import { accessLimit } from './access-limit.js';
 import { consentRecords, consentEvents } from '../../../db/schema/consents.js';
 import { studentPlayProfiles, classroomWindows, gameActivations } from '../../../db/schema/aula.js';
-import { aliasInput, figureInput, signTicket, readTicket, ticketInput } from './aula-security.js';
+import { aliasInput, figureInput, normalizeAlias, signTicket, readTicket, ticketInput } from './aula-security.js';
 
 type SessionRow = typeof gameSessions.$inferSelect;
 type Capability = typeof runtimeCapabilities.$inferSelect;
@@ -525,6 +525,30 @@ export function createGameService(deps: GameDependencies = {}) {
         const row = { studentId: s.id, groupId: s.groupId, alias: input.alias, figure: input.figure, updatedBy: actor.accountId, updatedAt: new Date() };
         await tx.insert(studentPlayProfiles).values(row).onConflictDoUpdate({ target: studentPlayProfiles.studentId, set: row });
         return { studentId: s.id, alias: input.alias, figure: input.figure, updatedAt: row.updatedAt.toISOString() };
+      });
+    },
+    // Propone apodo (a partir del seudónimo, sin repetir en el curso) y figura a quienes aún no tienen; la docente puede editarlos.
+    async autoProfiles(actor: AcademicActor, groupId: string, payload: unknown) {
+      z.strictObject({}).parse(payload);
+      return withAcademicAccess(actor, async tx => {
+        await ownGroup(tx, actor, groupId);
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'aula-profiles:' + groupId}, 0))`);
+        const rows = await tx.select({ s: students, p: studentPlayProfiles }).from(students).leftJoin(studentPlayProfiles, eq(studentPlayProfiles.studentId, students.id))
+          .where(and(eq(students.groupId, groupId), eq(students.isActive, true))).orderBy(asc(students.lastName), asc(students.firstName));
+        const taken = new Set((await tx.select({ alias: studentPlayProfiles.alias }).from(studentPlayProfiles).where(eq(studentPlayProfiles.groupId, groupId))).map(r => r.alias));
+        let created = 0;
+        for (const { s, p } of rows) {
+          if (p && p.groupId === groupId) continue;
+          let base = normalizeAlias(s.firstName).slice(0, 12);
+          if (base.length < 3) base = (base + 'KUD').slice(0, 3);
+          let alias = base;
+          for (let n = 2; taken.has(alias); n++) alias = `${base.slice(0, 15 - String(n).length)}${n}`;
+          taken.add(alias);
+          const row = { studentId: s.id, groupId, alias, figure: randomBytes(1)[0]! % 8, updatedBy: actor.accountId, updatedAt: new Date() };
+          await tx.insert(studentPlayProfiles).values(row).onConflictDoUpdate({ target: studentPlayProfiles.studentId, set: row });
+          created++;
+        }
+        return { ...await aulaOverview(tx, groupId), created };
       });
     },
     async aula(actor: AcademicActor, groupId: string) { return withAcademicAccess(actor, async tx => { await ownGroup(tx, actor, groupId); return aulaOverview(tx, groupId); }); },

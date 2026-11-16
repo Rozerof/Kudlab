@@ -23,7 +23,9 @@
     "docker:down": "docker --context desktop-linux compose --env-file .env.docker down",
     "docker:status": "docker --context desktop-linux compose --env-file .env.docker ps",
     "test:docker": "node --test tests/docker/*.test.mjs",
-    "docker:check": "node --test tests/docker/*.smoke.mjs"
+    "docker:check": "node --test tests/docker/*.smoke.mjs",
+    "test:aula": "node --test tests/aula/*.test.mjs",
+    "test:unit": "node --test tests/auth/*.test.mjs tests/usuarios/*.test.mjs tests/tareas/*.test.mjs tests/academico/*.test.mjs tests/indicadores/*.test.mjs tests/aula/*.test.mjs tests/pages/*.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",

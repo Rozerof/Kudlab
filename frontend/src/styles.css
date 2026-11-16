@@ -483,3 +483,31 @@ body { font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; -w
 .dashboard-step-number { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #c2572b; }
 .panel-support { background: #f3f9fd; border-left: 4px solid var(--primary); padding: .6rem .9rem; border-radius: .25rem .75rem .75rem .25rem; }
 .aula-limits { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; font-size: .875rem; } .aula-limits label { display: inline-flex; align-items: center; gap: .4rem; font-weight: 500; } .aula-limits .aula-select { min-height: 2.25rem; padding: .2rem .5rem; }
+/* Tarjetas de acceso imprimibles (solo al imprimir) */
+.print-sheet { display: none; }
+@media print {
+  @page { size: letter; margin: 10mm; }
+  body > *:not(.print-sheet) { display: none !important; }
+  .print-sheet { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+  .print-card { break-inside: avoid; border: 1.5px dashed #555; border-radius: 4mm; padding: 5mm 6mm; height: 58mm; display: flex; flex-direction: column; font-family: inherit; color: #111; }
+  .print-card-brand { font-weight: 800; color: #1c2e57; font-size: 11pt; }
+  .print-card-course { font-size: 9pt; color: #444; margin-bottom: 2mm; }
+  .print-card-label { font-size: 8pt; text-transform: uppercase; letter-spacing: .06em; color: #555; margin-top: 1mm; }
+  .print-card-alias { font-size: 22pt; font-weight: 800; letter-spacing: .04em; line-height: 1.1; }
+  .print-card-figure { font-size: 16pt; font-weight: 700; }
+  .print-card-name { font-size: 8pt; color: #555; margin-top: auto; }
+  .print-card-url { font-size: 8pt; color: #333; }
+  .print-card-note { font-size: 7pt; color: #777; }
+}
+.panel-lines { margin: 0; } .panel-lines svg { width: 100%; max-width: 40rem; height: auto; display: block; }
+@media print {
+  .print-report { display: block !important; font-size: 10.5pt; color: #111; }
+  .print-report h1 { font-size: 20pt; font-weight: 800; margin: 1mm 0; }
+  .print-report h2 { font-size: 12.5pt; font-weight: 700; margin: 6mm 0 2mm; color: #1c2e57; border-bottom: 1px solid #ccd; padding-bottom: 1mm; }
+  .print-report h3 { font-size: 11pt; font-weight: 700; margin: 4mm 0 1mm; }
+  .print-report table { width: 100%; border-collapse: collapse; } .print-report th, .print-report td { border: 1px solid #ccd; padding: 1.5mm 2mm; text-align: left; font-size: 9.5pt; }
+  .print-report ul { margin: 1mm 0 0 5mm; }
+  .report-brand { color: #c2572b; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: 9pt; }
+  .report-meta { color: #444; }
+  .report-notice { margin-top: 8mm; padding: 3mm; border: 1px solid #ccd; border-radius: 2mm; font-size: 9pt; color: #333; }
+}

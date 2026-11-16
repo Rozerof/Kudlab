@@ -70,6 +70,7 @@
   "post /api/v1/groups createGroup",
   "post /api/v1/groups/{id}/aula/activations activateClassroomGame",
   "post /api/v1/groups/{id}/aula/activations/{taskId}/end endClassroomGame",
+  "post /api/v1/groups/{id}/aula/auto-profiles autoAssignPlayProfiles",
   "post /api/v1/groups/{id}/aula/close closeClassroom",
   "post /api/v1/groups/{id}/aula/open openClassroom",
   "post /api/v1/student-annotations createStudentAnnotation",
