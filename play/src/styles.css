@@ -187,3 +187,50 @@ a.button { display: inline-flex; align-items: center; justify-content: center; t
 .aula-game-text h2 { font-size: 1.35rem; }
 .aula-game-text p { color: var(--muted); margin-top: 2px; }
 @media (max-width: 520px) { .figure-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; } .figure-button { min-height: 76px; } .figure-emoji { font-size: 2rem; } .aula-game { flex-wrap: wrap; } }
+
+/* ---------- Acabado visual (15-11-2026): cielo suave, tarjetas con relieve y colores por juego ---------- */
+:root { --sky-1: #e9f6fb; --sky-2: #fdf6ea; --shadow: 0 1px 2px rgb(18 60 70 / 6%), 0 12px 32px -12px rgb(18 60 70 / 22%); --pink: #f2a7c3; --violet: #b9a6f2; --mint: #9fdcc4; --sun: #f8d278; --sky: #9fd3f0; }
+body { min-height: 100dvh; background:
+  radial-gradient(circle at 8% 12%, rgb(248 210 120 / 35%) 0 3px, transparent 4px),
+  radial-gradient(circle at 92% 18%, rgb(159 211 240 / 60%) 0 5px, transparent 6px),
+  radial-gradient(circle at 85% 78%, rgb(242 167 195 / 40%) 0 4px, transparent 5px),
+  radial-gradient(circle at 12% 70%, rgb(159 220 196 / 50%) 0 4px, transparent 5px),
+  radial-gradient(1200px 500px at 50% -10%, #fff 0, transparent 70%),
+  linear-gradient(180deg, var(--sky-1), var(--sky-2)); background-attachment: fixed; }
+.header { min-height: 96px; }
+.brand { font-size: 1.5rem; }
+.brand .shape { width: 36px; height: 36px; fill: var(--gold); filter: drop-shadow(0 2px 0 #c99a2e); }
+.brand-play { font-weight: 800; color: var(--surface); background: var(--accent); border-radius: 999px; padding: 0 12px; font-size: 1rem; line-height: 1.8; margin-left: 4px; }
+.header-tools { display: flex; gap: 4px; align-items: center; }
+.music-toggle[aria-pressed='false'] { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 2px; }
+.access-sheet, .delivery-note, .pending-row, .instruction-sheet { box-shadow: var(--shadow); }
+.access-sheet { border: 1px solid rgb(199 218 221 / 60%); border-radius: 28px; }
+h1 { font-weight: 800; }
+.primary { box-shadow: 0 4px 0 #0b3f43; }
+.primary:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 #0b3f43; }
+.primary:disabled { box-shadow: none; }
+.button { transition: background-color 150ms, transform 120ms, box-shadow 120ms; }
+/* Cursos: tarjetas de colores que se alternan */
+.aula-group { position: relative; overflow: hidden; border: 0; box-shadow: var(--shadow); transition: transform 150ms, box-shadow 150ms; font-weight: 800; }
+.aula-group::after { content: ''; position: absolute; right: -18px; bottom: -18px; width: 70px; height: 70px; border-radius: 50%; background: var(--tone, var(--sky)); opacity: .55; }
+.aula-group:hover { transform: translateY(-3px); }
+.aula-groups > :nth-child(5n+1) { --tone: var(--sky); } .aula-groups > :nth-child(5n+2) { --tone: var(--pink); } .aula-groups > :nth-child(5n+3) { --tone: var(--mint); }
+.aula-groups > :nth-child(5n+4) { --tone: var(--violet); } .aula-groups > :nth-child(5n+5) { --tone: var(--sun); }
+/* Figuras secretas */
+.figure-button { transition: transform 150ms, border-color 150ms, background-color 150ms; }
+.figure-button:hover { transform: translateY(-2px); }
+.figure-button[aria-pressed='true'] { transform: scale(1.05); background: #fff8e1; border-color: #e0a92a; box-shadow: 0 0 0 3px #e0a92a inset, 0 6px 18px -8px rgb(224 169 42 / 70%); }
+.figure-button[aria-pressed='true'] .figure-emoji { animation: pop 300ms ease-out; }
+@keyframes pop { 0% { transform: scale(.7); } 70% { transform: scale(1.2); } 100% { transform: scale(1); } }
+/* Juegos: cada uno con su color */
+.aula-game { border: 0; box-shadow: var(--shadow); border-left: 8px solid var(--tone, var(--sky)); transition: transform 150ms; }
+.aula-game:hover { transform: translateX(3px); }
+.aula-game-icon { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 18px; background: color-mix(in srgb, var(--tone, var(--sky)) 45%, white); font-size: 2.2rem; flex: none; }
+.aula-game .button.primary { font-size: 1.125rem; padding-inline: 28px; }
+.aula-game:has(.button:disabled) { opacity: .75; }
+.aula-games > :nth-child(4n+1) { --tone: var(--sky); } .aula-games > :nth-child(4n+2) { --tone: var(--pink); } .aula-games > :nth-child(4n+3) { --tone: var(--violet); } .aula-games > :nth-child(4n+4) { --tone: var(--mint); }
+/* Final: marca celebrando */
+.finish-mark { background: linear-gradient(135deg, #1d3d40, #2b5e63); box-shadow: var(--shadow); animation: pop 450ms ease-out; }
+.finish-sheet h1 { font-size: 2.25rem; }
+.footer { opacity: .85; }
+@media (max-width: 640px) { .brand { font-size: 1.25rem; } .music-toggle { padding-inline: 10px; } .aula-game-icon { width: 52px; height: 52px; font-size: 1.8rem; } }

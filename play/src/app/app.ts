@@ -11,6 +11,7 @@ import { SupervisedBridge } from '../bridge/supervised';
 import { registry, supported } from '../games/registry';
 import { button, el, shape } from './dom';
 import { countdown } from './countdown';
+import { Music, MUSIC_WHILE_PLAYING } from './music';
 
 function offlineIcon(): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -77,6 +78,7 @@ export class App {
   private playedSessionId?: string;
   private savedNotified?: string;
   // Modo aula (en memoria; al recargar el niño vuelve a escribir su apodo).
+  private music = new Music();
   private codeMode = false;
   private aulaGroups?: AulaGroup[];
   private aulaGroupsError = '';
@@ -92,7 +94,11 @@ export class App {
     const header = el('header', 'header');
     const brand = el('div', 'brand'); brand.append(shape('star'), el('span', '', 'Kudlab'), el('span', 'brand-play', 'Play'));
     const help = button('Ayuda', () => this.help(), 'button quiet');
-    header.append(brand, help);
+    const sound = button('', () => this.music.toggle(), 'button quiet music-toggle');
+    const paint = () => { sound.textContent = this.music.enabled ? '♪ Música' : '♪ Sin música'; sound.setAttribute('aria-pressed', String(this.music.enabled)); sound.setAttribute('aria-label', this.music.enabled ? 'Apagar la música' : 'Encender la música'); };
+    paint(); this.music.onChange(paint);
+    const tools = el('div', 'header-tools'); tools.append(sound, help);
+    header.append(brand, tools);
     const footer = el('footer', 'footer');
     footer.append(el('span', '', 'Un momento para mirar y tocar.'), el('span', '', 'Actividad acompañada'));
     this.root.replaceChildren(header, this.main, footer, this.live);
@@ -234,6 +240,7 @@ export class App {
     await this.db!.put('credentials', { ...credential, phase: 'START_CONFIRMED', context: { ...context, capabilities: { ...context.capabilities, canStart: false } } });
     const title = EXTERNAL_GAMES[context.taskId].title;
     this.externalActive = true; this.screen = 'running';
+    this.music.setMode(MUSIC_WHILE_PLAYING.has(context.taskId) ? 'play' : 'silent');
     const host = el('section', 'external-host'); host.setAttribute('aria-label', title);
     this.main.replaceChildren(host);
     let message: string;
@@ -244,7 +251,7 @@ export class App {
     } catch {
       message = 'No pudimos iniciar la actividad. Comprueba la conexión y pide ayuda a tu profesor.';
     }
-    this.externalActive = false; this.screen = 'access';
+    this.externalActive = false; this.screen = 'access'; this.music.setMode('menu');
     this.main.replaceChildren();
     const done = el('section', 'access-sheet');
     done.append(el('h1', '', title), el('p', 'intro-copy', message), this.aula ? this.backToGames() : this.publicLink('/', 'Ingresar otro código'));
@@ -255,6 +262,8 @@ export class App {
     for (const timer of this.exampleTimers) clearTimeout(timer);
     this.exampleTimers = [];
     this.main.replaceChildren(); this.startButton = undefined; this.reasonNode = undefined;
+    // Lluvia de estrellas mide atención sostenida: silencio desde la cuenta regresiva hasta el final.
+    this.music.setMode(this.starting || this.screen === 'running' ? 'silent' : 'menu');
     if (this.screen === 'access') this.accessScreen();
     else if (this.screen === 'pending') this.pendingScreen();
     else if (this.screen === 'instructions') this.instructions();
@@ -496,7 +505,7 @@ export class App {
   }
   private async begin(): Promise<void> {
     if (this.unavailable() || !this.context || !this.session || !this.db) return;
-    this.starting = true; this.refreshAvailability();
+    this.starting = true; this.music.setMode('silent'); this.refreshAvailability();
     const layout = this.layout();
     const adaptive = isViewportConfig(this.context.config);
     const meta: Pick<Snapshot, 'clock' | 'device' | 'startedAtMs'> = { clock: { id: crypto.randomUUID(), timeOriginUnixMs: performance.timeOrigin },
