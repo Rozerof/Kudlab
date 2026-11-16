@@ -325,13 +325,16 @@ export function createGameService(deps: GameDependencies = {}) {
     const [w] = await tx.select().from(classroomWindows).where(eq(classroomWindows.groupId, groupId));
     return w && w.openedAt <= now && w.closesAt > now ? w : null;
   }
+  // Versión publicada más reciente que tenga una configuración utilizable (las versiones sin configuración se saltan).
   async function latestConfiguration(tx: Tx, taskId: string) {
-    const [v] = await tx.select().from(taskPublishedVersions).where(eq(taskPublishedVersions.taskId, taskId)).orderBy(desc(taskPublishedVersions.version)).limit(1);
-    if (!v) return null;
-    try {
-      const c = await configuration(tx, v.id);
-      return c.task.isEnabled && methodAllowed(c.rule) && ['1.1', 'ext-1'].includes(c.config.contractVersion) ? c : null;
-    } catch (error) { if (error instanceof GameError) return null; throw error; }
+    const versions = await tx.select().from(taskPublishedVersions).where(eq(taskPublishedVersions.taskId, taskId)).orderBy(desc(taskPublishedVersions.version)).limit(20);
+    for (const v of versions) {
+      try {
+        const c = await configuration(tx, v.id);
+        if (c.task.isEnabled && methodAllowed(c.rule) && ['1.1', 'ext-1'].includes(c.config.contractVersion)) return c;
+      } catch (error) { if (!(error instanceof GameError)) throw error; }
+    }
+    return null;
   }
   async function activeActivations(tx: Tx, groupId: string) {
     return tx.select({ v: gameActivations, a: assignments, title: tasks.title }).from(gameActivations)
