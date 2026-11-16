@@ -85,6 +85,10 @@ export function createGameRoutes(deps: GameDependencies = {}) {
     if (buckets.size >= 10000 && !buckets.has(key)) throw new GameError(503, 'UNAVAILABLE');
     buckets.set(key, bucket); await next();
   });
+  runtime.get('/access/aula/groups', async c => { empty(c); return c.json(await service.aulaGroups()); });
+  runtime.post('/access/aula/identify', async c => { empty(c); return c.json(await service.aulaIdentify(await body(c, 4096))); });
+  runtime.post('/access/aula/games', async c => { empty(c); return c.json(await service.aulaGames(await body(c, 4096))); });
+  runtime.post('/access/aula/code', async c => { empty(c); return c.json(await service.aulaCode(await body(c, 4096))); });
   runtime.post('/access/claim', async c => { empty(c); return c.json(await service.accessClaim(await body(c, 4096))); });
   runtime.post('/access/recover', async c => { empty(c); return c.json(await service.accessClaim(await body(c, 4096), true)); });
   runtime.post('/launches/claim', async c => { empty(c); return c.json(await service.claim(bearer(c), await body(c, 4096))); });
@@ -108,7 +112,13 @@ export function createGameRoutes(deps: GameDependencies = {}) {
     if (c.get('currentAccount').role !== 'TEACHER') throw new GameError(403, 'FORBIDDEN');
     await next();
   };
-  for (const path of ['/task-assignments', '/task-assignments/*', '/task-assignment-recipients/*', '/task-access-codes/*', '/task-sessions/*', '/students/:id/task-sessions', '/students/:id/task-assignments']) teacher.use(path, protect);
+  for (const path of ['/task-assignments', '/task-assignments/*', '/task-assignment-recipients/*', '/task-access-codes/*', '/task-sessions/*', '/students/:id/task-sessions', '/students/:id/task-assignments', '/students/:id/play-profile', '/groups/:id/aula', '/groups/:id/aula/*']) teacher.use(path, protect);
+  teacher.put('/students/:id/play-profile', async c => { empty(c); return c.json(await service.setPlayProfile(academicActor(c), c.req.param('id'), await body(c, 4096))); });
+  teacher.get('/groups/:id/aula', async c => { empty(c); return c.json(await service.aula(academicActor(c), c.req.param('id'))); });
+  teacher.post('/groups/:id/aula/open', async c => { empty(c); return c.json(await service.openClass(academicActor(c), c.req.param('id'), await body(c, 4096))); });
+  teacher.post('/groups/:id/aula/close', async c => { empty(c); return c.json(await service.closeClass(academicActor(c), c.req.param('id'), await body(c, 4096))); });
+  teacher.post('/groups/:id/aula/activations', async c => { empty(c); return c.json(await service.activateGame(academicActor(c), c.req.param('id'), await body(c, 65536))); });
+  teacher.post('/groups/:id/aula/activations/:taskId/end', async c => { empty(c); return c.json(await service.deactivateGame(academicActor(c), c.req.param('id'), c.req.param('taskId'), await body(c, 4096))); });
   teacher.post('/task-assignments/:id/access-codes', async c => { empty(c); const r = await service.generateCodes(academicActor(c), c.req.param('id'), await body(c, 16384)); return c.json(r.detail, r.repeated ? 200 : 201); });
   teacher.get('/task-assignments/:id/access-codes', async c => { const q = query(c, z.strictObject(pageSchema)); return c.json(await service.listCodes(academicActor(c), c.req.param('id'), q)); });
   teacher.post('/task-access-codes/:id/reveal', async c => { empty(c); return c.json(await service.revealCode(academicActor(c), c.req.param('id'), await body(c, 4096))); });

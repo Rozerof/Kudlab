@@ -21,6 +21,8 @@ import { accessCodes, accessClaims } from '../../../db/schema/access.js';
 import { accessDigest, accessSettings, codeInput, newCode, openCode, sealCode } from './access-security.js';
 import { accessLimit } from './access-limit.js';
 import { consentRecords, consentEvents } from '../../../db/schema/consents.js';
+import { studentPlayProfiles, classroomWindows, gameActivations } from '../../../db/schema/aula.js';
+import { aliasInput, figureInput, signTicket, readTicket, ticketInput } from './aula-security.js';
 
 type SessionRow = typeof gameSessions.$inferSelect;
 type Capability = typeof runtimeCapabilities.$inferSelect;
@@ -316,6 +318,74 @@ export function createGameService(deps: GameDependencies = {}) {
       await tx.update(gameSessions).set({ executionStatus: 'EXPIRED' }).where(eq(gameSessions.id, s.id));
     }
   }
+  // ---- Modo aula: apodo + figura secreta, clase abierta y juegos activos por curso o por estudiante ----
+  const AULA_TASKS = ['TG-01', 'TG-02', 'TG-03', 'TG-04'] as const;
+  type Activation = typeof gameActivations.$inferSelect;
+  async function openWindow(tx: Tx, groupId: string, now = new Date()) {
+    const [w] = await tx.select().from(classroomWindows).where(eq(classroomWindows.groupId, groupId));
+    return w && w.openedAt <= now && w.closesAt > now ? w : null;
+  }
+  async function latestConfiguration(tx: Tx, taskId: string) {
+    const [v] = await tx.select().from(taskPublishedVersions).where(eq(taskPublishedVersions.taskId, taskId)).orderBy(desc(taskPublishedVersions.version)).limit(1);
+    if (!v) return null;
+    try {
+      const c = await configuration(tx, v.id);
+      return c.task.isEnabled && methodAllowed(c.rule) && ['1.1', 'ext-1'].includes(c.config.contractVersion) ? c : null;
+    } catch (error) { if (error instanceof GameError) return null; throw error; }
+  }
+  async function activeActivations(tx: Tx, groupId: string) {
+    return tx.select({ v: gameActivations, a: assignments, title: tasks.title }).from(gameActivations)
+      .innerJoin(assignments, eq(assignments.id, gameActivations.assignmentId)).innerJoin(tasks, eq(tasks.id, gameActivations.taskId))
+      .where(and(eq(gameActivations.groupId, groupId), sql`${gameActivations.endedAt} is null`)).orderBy(asc(gameActivations.taskId));
+  }
+  const visibleTo = (v: Activation, studentId: string) => v.audience === 'GROUP' || v.studentIds.includes(studentId);
+  async function endActivation(tx: Tx, v: Activation, by: string, now = new Date()) {
+    await tx.update(gameActivations).set({ endedAt: now }).where(and(eq(gameActivations.id, v.id), sql`${gameActivations.endedAt} is null`));
+    await tx.update(assignments).set({ status: 'CANCELLED', cancelledAt: now, cancelledBy: by }).where(and(eq(assignments.id, v.assignmentId), eq(assignments.status, 'OPEN')));
+  }
+  async function studentGames(tx: Tx, studentId: string, groupId: string) {
+    const now = new Date(), games = [];
+    let allowed = true;
+    try { await requireParticipation(participation, tx, studentId, now); } catch (error) { if (!(error instanceof GameError) || error.status === 503) throw error; allowed = false; }
+    for (const { v, a, title } of await activeActivations(tx, groupId)) {
+      if (!visibleTo(v, studentId) || a.status !== 'OPEN' || now >= a.endsAt) continue;
+      const [r] = await tx.select().from(recipients).where(and(eq(recipients.assignmentId, a.id), eq(recipients.studentId, studentId)));
+      const [used] = r ? await tx.select({ n: sql<number>`count(*)::int` }).from(gameSessions).where(and(eq(gameSessions.recipientId, r.id), isNotNull(gameSessions.attemptNumber))) : [{ n: 0 }];
+      games.push({ taskId: v.taskId, title, attemptsLeft: Math.max(0, a.maxAttempts - used!.n), canPlay: allowed && used!.n < a.maxAttempts });
+    }
+    return { participationAllowed: allowed, games };
+  }
+  async function aulaStudent(tx: Tx, ticket: string) {
+    const t = readTicket(ticket);
+    const [s] = await tx.select().from(students).where(eq(students.id, t.studentId));
+    if (!s || !s.isActive || s.groupId !== t.groupId) throw accessUnavailable();
+    const [g] = await tx.select().from(groups).where(eq(groups.id, s.groupId)).for('share');
+    if (!g) throw accessUnavailable();
+    if (!await openWindow(tx, g.id)) throw new GameError(403, 'ACCESS_UNAVAILABLE', 'CLASS_CLOSED');
+    const [p] = await tx.select().from(studentPlayProfiles).where(eq(studentPlayProfiles.studentId, s.id));
+    if (!p || p.groupId !== g.id || p.updatedAt.getTime() !== t.profileVersion) throw accessUnavailable();
+    return { s, g, p };
+  }
+  async function aulaOverview(tx: Tx, groupId: string) {
+    const window = await openWindow(tx, groupId);
+    const rows = await tx.select({ s: students, p: studentPlayProfiles }).from(students).leftJoin(studentPlayProfiles, eq(studentPlayProfiles.studentId, students.id))
+      .where(and(eq(students.groupId, groupId), eq(students.isActive, true))).orderBy(asc(students.lastName), asc(students.firstName));
+    const now = new Date(), list = [];
+    for (const { s, p } of rows) {
+      let canPlay = true;
+      try { await requireParticipation(participation, tx, s.id, now); } catch (error) { if (!(error instanceof GameError) || error.status === 503) throw error; canPlay = false; }
+      list.push({ id: s.id, displayName: `${s.firstName} ${s.lastName}`, studentCode: s.studentCode, alias: p?.groupId === groupId ? p.alias : null, figure: p?.groupId === groupId ? p.figure : null, participationAllowed: canPlay });
+    }
+    const active = await activeActivations(tx, groupId), games = [];
+    for (const taskId of AULA_TASKS) {
+      const [task] = await tx.select().from(tasks).where(eq(tasks.id, taskId));
+      if (!task) continue;
+      const current = active.find(x => x.v.taskId === taskId);
+      games.push({ taskId, title: task.title, available: !!await latestConfiguration(tx, taskId),
+        activation: current ? { id: current.v.id, audience: current.v.audience, studentIds: current.v.studentIds, createdAt: current.v.createdAt.toISOString() } : null });
+    }
+    return { groupId, window: window ? { openedAt: window.openedAt.toISOString(), closesAt: window.closesAt.toISOString() } : null, students: list, games };
+  }
   return {
     async generateCodes(actor: AcademicActor, id: string, payload: unknown) {
       accessSettings();
@@ -438,6 +508,117 @@ export function createGameService(deps: GameDependencies = {}) {
       }); } catch (error) {
         if (error instanceof GameError && (error.status === 503 || error.status === 429)) throw error;
         if (error instanceof GameError || error && typeof error === 'object' && 'status' in error || (error as { cause?: { code?: string } })?.cause?.code === '23505') throw accessUnavailable();
+        throw error;
+      }
+    },
+    // Docente: apodo (único por curso) y figura secreta del estudiante.
+    async setPlayProfile(actor: AcademicActor, studentId: string, payload: unknown) {
+      const input = z.strictObject({ alias: aliasInput, figure: figureInput }).parse(payload);
+      return withAcademicAccess(actor, async tx => {
+        const s = await ownStudent(tx, actor, studentId);
+        const [taken] = await tx.select().from(studentPlayProfiles).where(and(eq(studentPlayProfiles.groupId, s.groupId), eq(studentPlayProfiles.alias, input.alias)));
+        if (taken && taken.studentId !== s.id) throw conflict('ALIAS_TAKEN');
+        const row = { studentId: s.id, groupId: s.groupId, alias: input.alias, figure: input.figure, updatedBy: actor.accountId, updatedAt: new Date() };
+        await tx.insert(studentPlayProfiles).values(row).onConflictDoUpdate({ target: studentPlayProfiles.studentId, set: row });
+        return { studentId: s.id, alias: input.alias, figure: input.figure, updatedAt: row.updatedAt.toISOString() };
+      });
+    },
+    async aula(actor: AcademicActor, groupId: string) { return withAcademicAccess(actor, async tx => { await ownGroup(tx, actor, groupId); return aulaOverview(tx, groupId); }); },
+    async openClass(actor: AcademicActor, groupId: string, payload: unknown) {
+      const input = z.strictObject({ minutes: z.number().int().min(15).max(240) }).parse(payload);
+      return withAcademicAccess(actor, async tx => {
+        await ownGroup(tx, actor, groupId); const now = new Date();
+        const row = { groupId, openedBy: actor.accountId, openedAt: now, closesAt: new Date(now.getTime() + input.minutes * 60000) };
+        await tx.insert(classroomWindows).values(row).onConflictDoUpdate({ target: classroomWindows.groupId, set: row });
+        return aulaOverview(tx, groupId);
+      });
+    },
+    async closeClass(actor: AcademicActor, groupId: string, payload: unknown) {
+      z.strictObject({}).parse(payload);
+      return withAcademicAccess(actor, async tx => {
+        await ownGroup(tx, actor, groupId);
+        await tx.delete(classroomWindows).where(eq(classroomWindows.groupId, groupId));
+        return aulaOverview(tx, groupId);
+      });
+    },
+    // Activa un juego para todo el curso o para estudiantes elegidos; reemplaza la audiencia si ya estaba activo.
+    async activateGame(actor: AcademicActor, groupId: string, payload: unknown) {
+      const input = z.strictObject({ taskId: z.enum(AULA_TASKS), audience: z.enum(['GROUP', 'STUDENTS']), studentIds: z.array(uuid).max(1000).default([]) })
+        .refine(v => v.audience === 'GROUP' || v.studentIds.length > 0).refine(v => new Set(v.studentIds).size === v.studentIds.length).parse(payload);
+      return withAcademicAccess(actor, async tx => {
+        await ownGroup(tx, actor, groupId);
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'aula:' + groupId + ':' + input.taskId}, 0))`);
+        for (const id of input.studentIds) { const s = await ownStudent(tx, actor, id); if (s.groupId !== groupId || !s.isActive) throw notFound(); }
+        const studentIds = input.audience === 'GROUP' ? [] : [...input.studentIds].sort();
+        const [current] = await tx.select().from(gameActivations).where(and(eq(gameActivations.groupId, groupId), eq(gameActivations.taskId, input.taskId), sql`${gameActivations.endedAt} is null`));
+        const [currentAssignment] = current ? await tx.select().from(assignments).where(eq(assignments.id, current.assignmentId)) : [];
+        if (current && currentAssignment?.status === 'OPEN' && new Date() < currentAssignment.endsAt) {
+          await tx.update(gameActivations).set({ audience: input.audience, studentIds }).where(eq(gameActivations.id, current.id));
+          return aulaOverview(tx, groupId);
+        }
+        if (current) await endActivation(tx, current, actor.accountId);
+        const c = await latestConfiguration(tx, input.taskId);
+        if (!c) throw conflict('TASK_UNAVAILABLE');
+        const now = new Date(), content = { taskId: input.taskId, publishedVersionId: c.version.id, groupId, aula: true, at: now.toISOString() };
+        const [a] = await tx.insert(assignments).values({ taskId: input.taskId, publishedVersionId: c.version.id, groupId, createdBy: actor.accountId,
+          startsAt: new Date(now.getTime() - 60000), endsAt: new Date(now.getTime() + 180 * 86400000), maxAttempts: 10, requestId: randomUUID(), requestHash: hash(content) }).returning();
+        await tx.insert(gameActivations).values({ groupId, taskId: input.taskId, assignmentId: a!.id, audience: input.audience, studentIds, createdBy: actor.accountId });
+        return aulaOverview(tx, groupId);
+      });
+    },
+    async deactivateGame(actor: AcademicActor, groupId: string, taskId: string, payload: unknown) {
+      z.strictObject({}).parse(payload); const id = z.enum(AULA_TASKS).parse(taskId);
+      return withAcademicAccess(actor, async tx => {
+        await ownGroup(tx, actor, groupId);
+        const [current] = await tx.select().from(gameActivations).where(and(eq(gameActivations.groupId, groupId), eq(gameActivations.taskId, id), sql`${gameActivations.endedAt} is null`));
+        if (current) await endActivation(tx, current, actor.accountId);
+        return aulaOverview(tx, groupId);
+      });
+    },
+    // Estudiante (público, con límite por IP y por apodo): cursos con clase abierta.
+    async aulaGroups() {
+      accessSettings(); const now = new Date();
+      const rows = await db.select({ id: groups.id, name: groups.name, grade: groups.grade }).from(classroomWindows).innerJoin(groups, eq(groups.id, classroomWindows.groupId))
+        .where(and(sql`${classroomWindows.openedAt} <= ${now}`, sql`${classroomWindows.closesAt} > ${now}`)).orderBy(asc(groups.grade), asc(groups.name));
+      return { items: rows };
+    },
+    async aulaIdentify(payload: unknown) {
+      accessSettings();
+      const input = z.strictObject({ groupId: uuid, alias: aliasInput, figure: figureInput }).parse(payload);
+      const wait = await accessLimit(`aula:${input.groupId}:${input.alias}`, 'code');
+      if (wait) throw new GameError(429, 'RATE_LIMITED', undefined, wait);
+      return db.transaction(async tx => {
+        if (!await openWindow(tx, input.groupId)) throw new GameError(403, 'ACCESS_UNAVAILABLE', 'CLASS_CLOSED');
+        const [row] = await tx.select({ p: studentPlayProfiles, s: students }).from(studentPlayProfiles).innerJoin(students, eq(students.id, studentPlayProfiles.studentId))
+          .where(and(eq(studentPlayProfiles.groupId, input.groupId), eq(studentPlayProfiles.alias, input.alias)));
+        if (!row || row.p.figure !== input.figure || !row.s.isActive || row.s.groupId !== input.groupId) throw accessUnavailable();
+        const list = await studentGames(tx, row.s.id, input.groupId);
+        return { ticket: signTicket(row.s.id, input.groupId, row.p.updatedAt.getTime()), alias: row.p.alias, ...list };
+      });
+    },
+    async aulaGames(payload: unknown) {
+      accessSettings(); const input = z.strictObject({ ticket: ticketInput }).parse(payload);
+      return db.transaction(async tx => { const { s, g, p } = await aulaStudent(tx, input.ticket); return { alias: p.alias, ...await studentGames(tx, s.id, g.id) }; });
+    },
+    // Entrega el código de un solo juego para el flujo normal de Play (claim → start → results).
+    async aulaCode(payload: unknown) {
+      accessSettings(); const input = z.strictObject({ ticket: ticketInput, taskId: z.enum(AULA_TASKS) }).parse(payload);
+      try { return await db.transaction(async tx => {
+        const { s, g } = await aulaStudent(tx, input.ticket);
+        const [found] = (await activeActivations(tx, g.id)).filter(x => x.v.taskId === input.taskId && visibleTo(x.v, s.id));
+        if (!found) throw new GameError(403, 'ACCESS_UNAVAILABLE', 'GAME_INACTIVE');
+        await lockStudent(tx, s.id); await expire(tx, s.id);
+        await tx.insert(recipients).values({ assignmentId: found.a.id, studentId: s.id }).onConflictDoNothing();
+        const [r] = await tx.select().from(recipients).where(and(eq(recipients.assignmentId, found.a.id), eq(recipients.studentId, s.id)));
+        // Un juego preparado y nunca iniciado (pestaña cerrada) no debe bloquear al niño: se descarta.
+        const stale = await tx.select({ id: gameSessions.id }).from(gameSessions).where(and(eq(gameSessions.studentId, s.id), eq(gameSessions.taskId, input.taskId), eq(gameSessions.executionStatus, 'READY')));
+        const now = new Date();
+        for (const x of stale) { await tx.update(runtimeCapabilities).set({ revokedAt: now }).where(eq(runtimeCapabilities.sessionId, x.id)); await tx.update(launchGrants).set({ invalidatedAt: now }).where(eq(launchGrants.sessionId, x.id)); await tx.update(gameSessions).set({ executionStatus: 'EXPIRED' }).where(eq(gameSessions.id, x.id)); }
+        const c = await issueCode(tx, { accountId: g.teacherId, authUserId: '', sessionId: '' }, r!, found.a, null);
+        return { code: openCode(c.secretCiphertext, c.encryptionKeyId, aad(c)), expiresAt: c.expiresAt.toISOString() };
+      }); } catch (error) {
+        if (error instanceof GameError && (error.status === 503 || error.status === 429 || error.reason)) throw error;
+        if (error instanceof GameError) throw accessUnavailable();
         throw error;
       }
     },

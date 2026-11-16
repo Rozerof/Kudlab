@@ -17,6 +17,7 @@ import { createStudentsRoutes } from './modules/academico/students/students.rout
 import { createConsentsRoutes } from './modules/academico/consents/consents.routes.js';
 import { createIndicatorReadRoutes } from './modules/evolucion/read/routes.js';
 import { createObservationsRoutes } from './modules/seguimiento/observations/observations.routes.js';
+import { createPanelRoutes } from './modules/seguimiento/panel/panel.routes.js';
 import { createNotesRoutes } from './modules/academico/notes/notes.routes.js';
 import { createAnnotationsRoutes } from './modules/seguimiento/annotations/annotations.routes.js';
 import type { ConsentDependencies } from './modules/academico/consents/consents.service.js';
@@ -146,6 +147,8 @@ app.route('/api/v1/students', createConsentsRoutes(consents));
 // Indicadores: después de ambas guardias requireTeacher y ANTES de createStudentsRoutes, cuyo use('*') rechaza cualquier query.
 app.route('/', createIndicatorReadRoutes());
 app.route('/', createObservationsRoutes());
+app.use('/api/v1/groups/:id/review-priority', requireTeacher);
+app.route('/', createPanelRoutes());
 app.route('/', createNotesRoutes());
 app.route('/api/v1/student-annotations', createAnnotationsRoutes());
 app.route('/api/v1/students', createStudentsRoutes(game));

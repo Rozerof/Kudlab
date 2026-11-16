@@ -138,6 +138,15 @@ it('valida éxitos de todas las operaciones y errores de cada dominio contra el 
   await check(annotations, 'POST', await request(annotations, 'POST', { studentId: student.id, text: '  ' }, teacher), 400);
   await check(annotationPath, 'PATCH', await request(`${annotations}/${annotation.id}`, 'PATCH', { text: 'Contexto corregido' }, teacher), 200);
   await check(annotationPath, 'DELETE', await request(`${annotations}/${annotation.id}`, 'DELETE', undefined, teacher), 200);
+  // Panel de observación 0–5 y estrella de prioridad.
+  const panels = `${students}/{id}/observation-panels`, concretePanels = `${students}/${student.id}/observation-panels`;
+  const panelBody = { requestId: randomUUID(), period: '2026-P4', observedOn: '2026-11-13', area: 'AMBAS', responses: Object.fromEntries(Array.from({ length: 13 }, (_, i) => [`OD-${String(i + 1).padStart(2, '0')}`, 4])), notes: {} };
+  await check(panels, 'POST', await request(concretePanels, 'POST', panelBody, teacher), 201);
+  await check(panels, 'POST', await request(concretePanels, 'POST', panelBody, teacher), 200);
+  await check(panels, 'POST', await request(concretePanels, 'POST', { ...panelBody, requestId: randomUUID(), area: 'OTRA' }, teacher), 400);
+  await check(panels, 'GET', await request(concretePanels, 'GET', undefined, teacher), 200);
+  await check(panels, 'GET', await request(`${students}/${randomUUID()}/observation-panels`, 'GET', undefined, teacher), 404);
+  await check('/api/v1/groups/{id}/review-priority', 'GET', await request(`/api/v1/groups/${group!.id}/review-priority`, 'GET', undefined, teacher), 200);
   await check(`${students}/{id}`, 'PATCH', await request(`${students}/${student.id}`, 'PATCH', { firstName: 'Ejemplo' }, teacher), 200);
   await check(`${students}/{id}/deactivate`, 'POST', await request(`${students}/${student.id}/deactivate`, 'POST', undefined, teacher), 200);
   const roles = '/api/v1/admin-role-requests';

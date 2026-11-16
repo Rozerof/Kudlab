@@ -4766,6 +4766,242 @@ paths:
         '409': { $ref: '#/components/responses/AnnotationConflict' }
         '413': { $ref: '#/components/responses/AnnotationBadInput' }
         '503': { $ref: '#/components/responses/AcademicUnavailable' }
+  /api/v1/game-runtime/access/aula/groups:
+    get:
+      operationId: listOpenClassrooms
+      summary: Cursos con clase abierta
+      description: >-
+        Lista pública (sin sesión docente) de los cursos cuya clase está abierta ahora - id, nombre y grado. Límite por IP.
+      tags: [ Accesos ]
+      security: []
+      responses:
+        '200': { description: Respuesta confirmada; no-store., content: { application/json: { schema: { type: object } } } }
+        '400': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '401': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '403': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '404': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '409': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '429': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '503': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+  /api/v1/game-runtime/access/aula/identify:
+    post:
+      operationId: identifyClassroomStudent
+      summary: Entrar con apodo y figura secreta
+      description: >-
+        El estudiante elige su curso, escribe su apodo (único en el curso, sin tildes ni espacios) y toca su figura secreta. Solo funciona con la clase abierta; límite por IP y por apodo. Devuelve un ticket corto firmado y los juegos activos.
+      tags: [ Accesos ]
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: Respuesta confirmada; no-store., content: { application/json: { schema: { type: object } } } }
+        '400': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '401': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '403': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '404': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '409': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '429': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '503': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+  /api/v1/game-runtime/access/aula/games:
+    post:
+      operationId: listClassroomGames
+      summary: Juegos activos del estudiante
+      description: >-
+        Con el ticket de aula devuelve los juegos activos para el estudiante (todo el curso o solo él) y los intentos restantes.
+      tags: [ Accesos ]
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: Respuesta confirmada; no-store., content: { application/json: { schema: { type: object } } } }
+        '400': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '401': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '403': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '404': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '409': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '429': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '503': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+  /api/v1/game-runtime/access/aula/code:
+    post:
+      operationId: issueClassroomGameCode
+      summary: Código de un juego activo
+      description: >-
+        Con el ticket de aula entrega el código de un solo uso del juego elegido para el flujo normal de Play (claim, start, results).
+      tags: [ Accesos ]
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: Respuesta confirmada; no-store., content: { application/json: { schema: { type: object } } } }
+        '400': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '401': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '403': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '404': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '409': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '429': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '503': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+  /api/v1/students/{id}/play-profile:
+    parameters:
+      - { name: id, in: path, required: true, description: Identificador del recurso., schema: { type: string } }
+    put:
+      operationId: setStudentPlayProfile
+      summary: Definir apodo y figura secreta
+      description: >-
+        El docente del curso fija el apodo (3 a 15 letras o números, único en el curso; puede repetirse en otros cursos) y la figura secreta (0 a 7). Cambiarlos invalida los tickets vigentes.
+      tags: [ Accesos ]
+      security: *session
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: Respuesta confirmada; no-store., content: { application/json: { schema: { type: object } } } }
+        '400': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '401': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '403': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '404': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '409': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '503': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+  /api/v1/groups/{id}/aula:
+    parameters:
+      - { name: id, in: path, required: true, description: Identificador del recurso., schema: { type: string } }
+    get:
+      operationId: getClassroom
+      summary: Estado del modo aula
+      description: >-
+        Clase abierta o cerrada, estudiantes con su apodo y figura, y juegos con su activación (todo el curso o estudiantes elegidos).
+      tags: [ Accesos ]
+      security: *session
+      responses:
+        '200': { description: Respuesta confirmada; no-store., content: { application/json: { schema: { type: object } } } }
+        '400': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '401': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '403': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '404': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '409': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '503': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+  /api/v1/groups/{id}/aula/open:
+    parameters:
+      - { name: id, in: path, required: true, description: Identificador del recurso., schema: { type: string } }
+    post:
+      operationId: openClassroom
+      summary: Abrir la clase
+      description: >-
+        Abre la clase por 15 a 240 minutos; solo entonces funcionan los apodos.
+      tags: [ Accesos ]
+      security: *session
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: Respuesta confirmada; no-store., content: { application/json: { schema: { type: object } } } }
+        '400': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '401': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '403': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '404': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '409': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '503': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+  /api/v1/groups/{id}/aula/close:
+    parameters:
+      - { name: id, in: path, required: true, description: Identificador del recurso., schema: { type: string } }
+    post:
+      operationId: closeClassroom
+      summary: Cerrar la clase
+      description: >-
+        Cierra la clase de inmediato; los tickets dejan de servir.
+      tags: [ Accesos ]
+      security: *session
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: Respuesta confirmada; no-store., content: { application/json: { schema: { type: object } } } }
+        '400': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '401': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '403': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '404': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '409': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '503': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+  /api/v1/groups/{id}/aula/activations:
+    parameters:
+      - { name: id, in: path, required: true, description: Identificador del recurso., schema: { type: string } }
+    post:
+      operationId: activateClassroomGame
+      summary: Activar un juego
+      description: >-
+        Activa un juego para todo el curso (GROUP) o para estudiantes elegidos (STUDENTS). Si ya estaba activo cambia la audiencia sin perder intentos.
+      tags: [ Accesos ]
+      security: *session
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: Respuesta confirmada; no-store., content: { application/json: { schema: { type: object } } } }
+        '400': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '401': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '403': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '404': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '409': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '503': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+  /api/v1/groups/{id}/aula/activations/{taskId}/end:
+    parameters:
+      - { name: id, in: path, required: true, description: Identificador del recurso., schema: { type: string } }
+      - { name: taskId, in: path, required: true, description: Juego TG-01 a TG-04., schema: { type: string } }
+    post:
+      operationId: endClassroomGame
+      summary: Desactivar un juego
+      description: >-
+        Termina la activación y cancela su asignación; lo ya jugado se conserva.
+      tags: [ Accesos ]
+      security: *session
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: Respuesta confirmada; no-store., content: { application/json: { schema: { type: object } } } }
+        '400': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '401': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '403': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '404': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '409': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '503': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+  /api/v1/students/{id}/observation-panels:
+    parameters:
+      - { name: id, in: path, required: true, description: Identificador del recurso., schema: { type: string } }
+    get:
+      operationId: listObservationPanels
+      summary: Panel de observación 0 a 5
+      description: >-
+        Registros del panel (OD-01 a OD-13, valor 0 a 5 o null = No lo he observado) con resumen por bloque A a E (mínimo 2 respuestas; E con 1) y la línea por periodo. Sin puntaje global ni rankings.
+      tags: [ Estudiantes ]
+      security: *session
+      responses:
+        '200': { description: Respuesta confirmada; no-store., content: { application/json: { schema: { type: object } } } }
+        '400': { $ref: '#/components/responses/AcademicBadInput' }
+        '401': { $ref: '#/components/responses/AcademicUnauthenticated' }
+        '403': { $ref: '#/components/responses/AcademicForbidden' }
+        '404': { $ref: '#/components/responses/AcademicNotFound' }
+        '503': { $ref: '#/components/responses/AcademicUnavailable' }
+    post:
+      operationId: createObservationPanel
+      summary: Registrar el panel de observación
+      description: >-
+        Guarda estudiante, fecha, periodo (AAAA-P1 a P4), área (LECTURA, MATEMATICAS, AMBAS), las 13 respuestas y notas opcionales por bloque (máx. 140). Idempotente por requestId.
+      tags: [ Estudiantes ]
+      security: *session
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '201': { description: Respuesta confirmada; no-store., content: { application/json: { schema: { type: object } } } }
+        '200': { description: Respuesta confirmada; no-store., content: { application/json: { schema: { type: object } } } }
+        '400': { $ref: '#/components/responses/AcademicBadInput' }
+        '401': { $ref: '#/components/responses/AcademicUnauthenticated' }
+        '403': { $ref: '#/components/responses/AcademicForbidden' }
+        '404': { $ref: '#/components/responses/AcademicNotFound' }
+        '409': { $ref: '#/components/responses/AcademicConflict' }
+        '503': { $ref: '#/components/responses/AcademicUnavailable' }
+  /api/v1/groups/{id}/review-priority:
+    parameters:
+      - { name: id, in: path, required: true, description: Identificador del recurso., schema: { type: string } }
+    get:
+      operationId: getReviewPriority
+      summary: Estrella de prioridad de revisión
+      description: >-
+        Por estudiante AL_DIA (azul), REVISAR (morado), PRIORIDAD (rosado) o INSUFICIENTE (gris), con mensaje. Compara al estudiante consigo mismo (sesiones previas y observación docente), nunca con compañeros. Prioridad de revisión, no diagnóstico.
+      tags: [ Cursos ]
+      security: *session
+      responses:
+        '200': { description: Respuesta confirmada; no-store., content: { application/json: { schema: { type: object } } } }
+        '400': { $ref: '#/components/responses/AcademicBadInput' }
+        '401': { $ref: '#/components/responses/AcademicUnauthenticated' }
+        '403': { $ref: '#/components/responses/AcademicForbidden' }
+        '404': { $ref: '#/components/responses/AcademicNotFound' }
+        '503': { $ref: '#/components/responses/AcademicUnavailable' }
 components:
   securitySchemes:
     sessionCookie:
