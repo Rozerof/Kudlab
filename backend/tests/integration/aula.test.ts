@@ -48,11 +48,12 @@ describe('Modo aula', () => {
     expect(who.body).toMatchObject({ alias: 'TIGRE', games: [] });
 
     // Activación para todo el curso.
-    const act = await call(`/groups/${group}/aula/activations`, { taskId: 'TG-01', audience: 'GROUP' }, t);
+    expect((await call(`/groups/${group}/aula/activations`, { taskId: 'TG-01', audience: 'GROUP', until: '2020-01-01' }, t)).body).toMatchObject({ reason: 'INVALID_LIMITS' });
+    const act = await call(`/groups/${group}/aula/activations`, { taskId: 'TG-01', audience: 'GROUP', maxAttempts: 2 }, t);
     expect(act.status, JSON.stringify(act.body)).toBe(200);
-    expect(act.body.games.find((g: { taskId: string }) => g.taskId === 'TG-01').activation).toMatchObject({ audience: 'GROUP' });
+    expect(act.body.games.find((g: { taskId: string }) => g.taskId === 'TG-01').activation).toMatchObject({ audience: 'GROUP', maxAttempts: 2, expired: false });
     const games = await call('/game-runtime/access/aula/games', { ticket: who.body.ticket });
-    expect(games.body.games).toEqual([expect.objectContaining({ taskId: 'TG-01', attemptsLeft: 10, canPlay: true })]);
+    expect(games.body.games).toEqual([expect.objectContaining({ taskId: 'TG-01', attemptsLeft: 2, canPlay: true })]);
 
     // Código del juego → flujo normal de Play (claim + start). Reintentar sin iniciar no bloquea.
     const first = await call('/game-runtime/access/aula/code', { ticket: who.body.ticket, taskId: 'TG-01' });
@@ -63,7 +64,7 @@ describe('Modo aula', () => {
     const ctx = await call('/game-runtime/access/claim', { code, claimId: randomUUID(), runtimeSecret: secret });
     expect(ctx.status, JSON.stringify(ctx.body)).toBe(200);
     expect((await call(`/game-runtime/sessions/${ctx.body.sessionId}/start`, { startId: randomUUID() }, { authorization: `Bearer ${secret}` })).status).toBe(200);
-    expect((await call('/game-runtime/access/aula/games', { ticket: who.body.ticket })).body.games[0]).toMatchObject({ attemptsLeft: 9 });
+    expect((await call('/game-runtime/access/aula/games', { ticket: who.body.ticket })).body.games[0]).toMatchObject({ attemptsLeft: 1 });
 
     // Solo para un estudiante: el otro deja de verlo.
     await call(`/groups/${group}/aula/activations`, { taskId: 'TG-01', audience: 'STUDENTS', studentIds: [f.secondStudent.id] }, t);

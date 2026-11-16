@@ -9,8 +9,10 @@ import { FIGURES, normalizeAlias, reasonOf } from './api.ts';
 import type { AulaApi, AulaGame, AulaResult, Classroom, Priority, PriorityLevel } from './api.ts';
 
 const playOrigin = () => (import.meta.env.VITE_PLAY_ORIGIN as string | undefined) ?? '';
+const bogotaDate = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
 const time = (iso: string) => new Date(iso).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
 function failureText(r: AulaResult<unknown>) {
+  if (r.kind === 'error' && r.status === 409 && reasonOf(r) === 'INVALID_LIMITS') return 'Revisa la fecha: debe ser de hoy en adelante y como máximo dentro de un año.';
   if (r.kind === 'error' && r.status === 409) return reasonOf(r) === 'TASK_UNAVAILABLE' ? 'Este juego no está disponible todavía (no hay una versión publicada y habilitada).' : 'La operación entró en conflicto. Actualiza e inténtalo otra vez.';
   if (r.kind === 'error' && r.status === 404) return 'No encontramos el curso o ya no tienes acceso.';
   return 'No pudimos confirmar el cambio. Revisa la conexión y vuelve a intentarlo.';
@@ -24,6 +26,9 @@ export function ClassroomMode({ api, groupId }: { api: AulaApi; groupId: string 
   const [message, setMessage] = useState('');
   const [minutes, setMinutes] = useState(60);
   const [choosing, setChoosing] = useState<AulaGame['taskId']>();
+  const [limits, setLimits] = useState<Partial<Record<AulaGame['taskId'], { maxAttempts: number; until: string }>>>({});
+  const limitsOf = (game: AulaGame) => limits[game.taskId] ?? { maxAttempts: game.activation?.maxAttempts ?? 3, until: game.activation?.endsAt ? bogotaDate(game.activation.endsAt) : '' };
+  const setLimit = (game: AulaGame, patch: Partial<{ maxAttempts: number; until: string }>) => setLimits(old => ({ ...old, [game.taskId]: { ...limitsOf(game), ...patch } }));
   useEffect(() => { if (query.result?.kind === 'success') setData(query.result.data); }, [query.result]);
   async function run(action: (signal: AbortSignal) => Promise<AulaResult<Classroom>>, done: string) {
     setBusy(true); setMessage('');
@@ -64,14 +69,22 @@ export function ClassroomMode({ api, groupId }: { api: AulaApi; groupId: string 
       const names = a?.audience === 'STUDENTS' ? data.students.filter(s => a.studentIds.includes(s.id)).map(s => s.alias ?? s.displayName) : [];
       return <li key={game.taskId} className="aula-game-row">
         <div className="min-w-0"><p className="font-semibold">{game.title}</p>
-          <p className={`text-sm ${a ? 'aula-on' : 'text-muted'}`}>{!game.available && !a ? 'No disponible: falta publicar o habilitar el juego.' : !a ? 'Inactivo' : a.audience === 'GROUP' ? '● Activo para todo el curso' : `● Activo para ${names.length} ${names.length === 1 ? 'estudiante' : 'estudiantes'}: ${names.join(', ')}`}</p></div>
+          <p className={`text-sm ${a && !a.expired ? 'aula-on' : 'text-muted'}`}>{!game.available && !a ? 'No disponible: falta publicar o habilitar el juego.' : !a ? 'Inactivo' : a.expired ? 'Terminó su fecha límite. Actívalo de nuevo si quieres que sigan jugando.' : a.audience === 'GROUP' ? '● Activo para todo el curso' : `● Activo para ${names.length} ${names.length === 1 ? 'estudiante' : 'estudiantes'}: ${names.join(', ')}`}</p>
+          {a && !a.expired && a.maxAttempts && <p className="text-xs text-muted">{a.maxAttempts} {a.maxAttempts === 1 ? 'intento' : 'intentos'} por estudiante{a.endsAt ? ` · hasta el ${new Date(a.endsAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Bogota' })}` : ''}</p>}</div>
+        {(game.available || a) && <div className="aula-limits">
+          <label>Intentos por estudiante <select className="aula-select" value={limitsOf(game).maxAttempts} onChange={e => setLimit(game, { maxAttempts: Number(e.target.value) })}>{Array.from({ length: 10 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}</option>)}</select></label>
+          <label>Activo hasta <input type="date" className="aula-select" value={limitsOf(game).until} min={bogotaDate(new Date().toISOString())} onChange={e => setLimit(game, { until: e.target.value })} /></label>
+          {!limitsOf(game).until && <span className="text-xs text-muted">Sin fecha: hasta el fin del año escolar.</span>}
+          {a && limits[game.taskId] && <span className="text-xs text-muted">Al cambiar los límites, el conteo de intentos empieza de nuevo.</span>}
+        </div>}
         <div className="staff-actions">
-          {(game.available || a) && a?.audience !== 'GROUP' && <Button onClick={() => void run(s => api.activate(groupId, game.taskId, 'GROUP', [], s), `${game.title}: activo para todo el curso.`)} disabled={busy}>Activar para todo el curso</Button>}
+          {a && a.audience === 'GROUP' && !a.expired && limits[game.taskId] && <Button onClick={() => void run(s => api.activate(groupId, game.taskId, 'GROUP', [], s, limitsOf(game)), `${game.title}: límites actualizados.`)} disabled={busy}>Aplicar límites</Button>}
+          {(game.available || a) && (a?.audience !== 'GROUP' || a.expired) && <Button onClick={() => void run(s => api.activate(groupId, game.taskId, 'GROUP', [], s, limitsOf(game)), `${game.title}: activo para todo el curso.`)} disabled={busy}>Activar para todo el curso</Button>}
           {(game.available || a) && <Button variant="outline" onClick={() => setChoosing(choosing === game.taskId ? undefined : game.taskId)} disabled={busy} aria-expanded={choosing === game.taskId}>Elegir estudiantes</Button>}
           {a && <Button variant="outline" onClick={() => void run(s => api.deactivate(groupId, game.taskId, s), `${game.title}: desactivado.`)} disabled={busy}>Desactivar</Button>}
         </div>
         {choosing === game.taskId && <ChooseStudents data={data} game={game} busy={busy} onCancel={() => setChoosing(undefined)}
-          onSave={ids => { setChoosing(undefined); void run(s => api.activate(groupId, game.taskId, 'STUDENTS', ids, s), `${game.title}: activo para ${ids.length} ${ids.length === 1 ? 'estudiante' : 'estudiantes'}.`); }} />}
+          onSave={ids => { setChoosing(undefined); void run(s => api.activate(groupId, game.taskId, 'STUDENTS', ids, s, limitsOf(game)), `${game.title}: activo para ${ids.length} ${ids.length === 1 ? 'estudiante' : 'estudiantes'}.`); }} />}
       </li>;
     })}</ul>
     <details className="aula-roster"><summary className="cursor-pointer font-semibold">Apodos y figuras del curso</summary>

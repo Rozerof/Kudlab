@@ -385,7 +385,8 @@ export function createGameService(deps: GameDependencies = {}) {
       if (!task) continue;
       const current = active.find(x => x.v.taskId === taskId);
       games.push({ taskId, title: task.title, available: !!await latestConfiguration(tx, taskId),
-        activation: current ? { id: current.v.id, audience: current.v.audience, studentIds: current.v.studentIds, createdAt: current.v.createdAt.toISOString() } : null });
+        activation: current ? { id: current.v.id, audience: current.v.audience, studentIds: current.v.studentIds, createdAt: current.v.createdAt.toISOString(),
+          maxAttempts: current.a.maxAttempts, endsAt: current.a.endsAt.toISOString(), expired: current.a.endsAt <= new Date() } : null });
     }
     return { groupId, window: window ? { openedAt: window.openedAt.toISOString(), closesAt: window.closesAt.toISOString() } : null, students: list, games };
   }
@@ -546,16 +547,23 @@ export function createGameService(deps: GameDependencies = {}) {
     },
     // Activa un juego para todo el curso o para estudiantes elegidos; reemplaza la audiencia si ya estaba activo.
     async activateGame(actor: AcademicActor, groupId: string, payload: unknown) {
-      const input = z.strictObject({ taskId: z.enum(AULA_TASKS), audience: z.enum(['GROUP', 'STUDENTS']), studentIds: z.array(uuid).max(1000).default([]) })
+      // Límites que fija la docente: intentos por estudiante (1–10) y último día en que el juego queda activo.
+      const input = z.strictObject({ taskId: z.enum(AULA_TASKS), audience: z.enum(['GROUP', 'STUDENTS']), studentIds: z.array(uuid).max(1000).default([]),
+        maxAttempts: z.number().int().min(1).max(10).optional(), until: z.iso.date().optional() })
         .refine(v => v.audience === 'GROUP' || v.studentIds.length > 0).refine(v => new Set(v.studentIds).size === v.studentIds.length).parse(payload);
       return withAcademicAccess(actor, async tx => {
-        await ownGroup(tx, actor, groupId);
+        const group = await ownGroup(tx, actor, groupId);
+        const until = input.until ?? `${group.schoolYear}-12-31`;
+        const endsAt = new Date(`${until}T23:59:59.999-05:00`);
+        if (!Number.isFinite(endsAt.getTime()) || endsAt <= new Date() || endsAt.getTime() > Date.now() + 366 * 86400000) throw conflict('INVALID_LIMITS');
         await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'aula:' + groupId + ':' + input.taskId}, 0))`);
         for (const id of input.studentIds) { const s = await ownStudent(tx, actor, id); if (s.groupId !== groupId || !s.isActive) throw notFound(); }
         const studentIds = input.audience === 'GROUP' ? [] : [...input.studentIds].sort();
         const [current] = await tx.select().from(gameActivations).where(and(eq(gameActivations.groupId, groupId), eq(gameActivations.taskId, input.taskId), sql`${gameActivations.endedAt} is null`));
         const [currentAssignment] = current ? await tx.select().from(assignments).where(eq(assignments.id, current.assignmentId)) : [];
-        if (current && currentAssignment?.status === 'OPEN' && new Date() < currentAssignment.endsAt) {
+        // Mismos límites: solo cambia quién juega (se conservan los intentos). Límites nuevos: nueva asignación (las condiciones son inmutables).
+        const sameLimits = currentAssignment && (input.maxAttempts === undefined || input.maxAttempts === currentAssignment.maxAttempts) && (input.until === undefined || currentAssignment.endsAt.getTime() === endsAt.getTime());
+        if (current && currentAssignment?.status === 'OPEN' && new Date() < currentAssignment.endsAt && sameLimits) {
           await tx.update(gameActivations).set({ audience: input.audience, studentIds }).where(eq(gameActivations.id, current.id));
           return aulaOverview(tx, groupId);
         }
@@ -564,7 +572,7 @@ export function createGameService(deps: GameDependencies = {}) {
         if (!c) throw conflict('TASK_UNAVAILABLE');
         const now = new Date(), content = { taskId: input.taskId, publishedVersionId: c.version.id, groupId, aula: true, at: now.toISOString() };
         const [a] = await tx.insert(assignments).values({ taskId: input.taskId, publishedVersionId: c.version.id, groupId, createdBy: actor.accountId,
-          startsAt: new Date(now.getTime() - 60000), endsAt: new Date(now.getTime() + 180 * 86400000), maxAttempts: 10, requestId: randomUUID(), requestHash: hash(content) }).returning();
+          startsAt: new Date(now.getTime() - 60000), endsAt, maxAttempts: input.maxAttempts ?? 3, requestId: randomUUID(), requestHash: hash(content) }).returning();
         await tx.insert(gameActivations).values({ groupId, taskId: input.taskId, assignmentId: a!.id, audience: input.audience, studentIds, createdBy: actor.accountId });
         return aulaOverview(tx, groupId);
       });

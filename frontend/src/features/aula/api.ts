@@ -6,7 +6,7 @@ import type { HttpResult } from '../usuarios/types.ts';
 export const FIGURES = [['🐱', 'Gato'], ['🐶', 'Perro'], ['⭐', 'Estrella'], ['🌙', 'Luna'], ['🚀', 'Cohete'], ['🌈', 'Arcoíris'], ['🍎', 'Manzana'], ['⚽', 'Balón']] as const;
 export type TaskId = 'TG-01' | 'TG-02' | 'TG-03' | 'TG-04';
 export type AulaStudent = { id: string; displayName: string; studentCode: string; alias: string | null; figure: number | null; participationAllowed: boolean };
-export type AulaGame = { taskId: TaskId; title: string; available: boolean; activation: { id: string; audience: 'GROUP' | 'STUDENTS'; studentIds: string[]; createdAt: string } | null };
+export type AulaGame = { taskId: TaskId; title: string; available: boolean; activation: { id: string; audience: 'GROUP' | 'STUDENTS'; studentIds: string[]; createdAt: string; maxAttempts?: number; endsAt?: string; expired?: boolean } | null };
 export type Classroom = { groupId: string; window: { openedAt: string; closesAt: string } | null; students: AulaStudent[]; games: AulaGame[] };
 export type PlayProfile = { studentId: string; alias: string; figure: number; updatedAt: string };
 export type PriorityLevel = 'AL_DIA' | 'REVISAR' | 'PRIORIDAD' | 'INSUFICIENTE';
@@ -35,8 +35,8 @@ export function createAulaApi(http: HttpClient) {
     classroom(groupId: string, signal: AbortSignal): Promise<AulaResult<Classroom>> { return uuid.test(groupId) ? get(`/api/v1/groups/${groupId}/aula`, signal, classroom) : missing(); },
     open(groupId: string, minutes: number, signal: AbortSignal) { return send(`/api/v1/groups/${groupId}/aula/open`, 'POST', { minutes }, signal, classroom); },
     close(groupId: string, signal: AbortSignal) { return send(`/api/v1/groups/${groupId}/aula/close`, 'POST', {}, signal, classroom); },
-    activate(groupId: string, taskId: TaskId, audience: 'GROUP' | 'STUDENTS', studentIds: string[], signal: AbortSignal) {
-      return send(`/api/v1/groups/${groupId}/aula/activations`, 'POST', { taskId, audience, studentIds }, signal, classroom);
+    activate(groupId: string, taskId: TaskId, audience: 'GROUP' | 'STUDENTS', studentIds: string[], signal: AbortSignal, limits: { maxAttempts?: number; until?: string } = {}) {
+      return send(`/api/v1/groups/${groupId}/aula/activations`, 'POST', { taskId, audience, studentIds, ...(limits.maxAttempts ? { maxAttempts: limits.maxAttempts } : {}), ...(limits.until ? { until: limits.until } : {}) }, signal, classroom);
     },
     deactivate(groupId: string, taskId: TaskId, signal: AbortSignal) { return send(`/api/v1/groups/${groupId}/aula/activations/${taskId}/end`, 'POST', {}, signal, classroom); },
     setProfile(studentId: string, alias: string, figure: number, signal: AbortSignal): Promise<AulaResult<PlayProfile>> {
