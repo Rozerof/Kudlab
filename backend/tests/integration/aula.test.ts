@@ -71,6 +71,11 @@ describe('Modo aula', () => {
     expect((await call('/game-runtime/access/aula/code', { ticket: who.body.ticket, taskId: 'TG-01' })).body).toMatchObject({ reason: 'GAME_INACTIVE' });
     const luna = await call('/game-runtime/access/aula/identify', { groupId: group, alias: 'LUNA', figure: 5 });
     expect(luna.body.games).toHaveLength(1);
+    // Canje directo del modo aula (sin pasar por /access/claim); repetir el mismo claimId es idempotente.
+    const direct = { ticket: luna.body.ticket, taskId: 'TG-01', claimId: randomUUID(), runtimeSecret: randomBytes(32).toString('base64url') };
+    const once = await call('/game-runtime/access/aula/claim', direct);
+    expect(once.status, JSON.stringify(once.body)).toBe(200);
+    expect((await call('/game-runtime/access/aula/claim', direct)).body.sessionId).toBe(once.body.sessionId);
 
     // Cambiar la figura invalida el ticket; cerrar la clase corta el acceso.
     await call(`/students/${f.secondStudent.id}/play-profile`, { alias: 'Luna', figure: 6 }, t, 'PUT');
@@ -80,7 +85,7 @@ describe('Modo aula', () => {
     await call(`/groups/${group}/aula/close`, {}, t);
     expect((await call('/game-runtime/access/aula/games', { ticket: who.body.ticket })).body).toMatchObject({ reason: 'CLASS_CLOSED' });
     const documented = operations(contract).filter(([route]) => route.includes('/aula') || route.endsWith('/play-profile')).map(([, , op]) => op.operationId);
-    expect(documented).toHaveLength(10);
+    expect(documented).toHaveLength(11);
     expect([...covered].filter(id => documented.includes(id)).sort()).toEqual(documented.sort());
   });
 });

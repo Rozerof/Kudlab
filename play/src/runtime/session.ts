@@ -10,7 +10,7 @@ export interface Credential {
   startId?: string; phase: 'CLAIMING' | 'READY' | 'STARTING' | 'START_CONFIRMED'; preparedSnapshot?: Snapshot;
   operationBlocked?: boolean; nextAttemptAt?: number; attemptCount?: number; lastErrorCode?: string;
   bridgeId?: string;
-  access?: { kind: 'PLAY' | 'RECOVER'; sessionId?: string; submissionId?: string };
+  access?: { kind: 'PLAY' | 'RECOVER' | 'AULA'; sessionId?: string; submissionId?: string; taskId?: string };
 }
 export class Session {
   constructor(readonly db: Database, readonly api: Api, readonly owner: string, private online = () => navigator.onLine) {}
@@ -45,6 +45,18 @@ export class Session {
     try { context = await this.api.access(code, c.claimId, c.runtimeSecret, recovery); }
     catch (error) { await this.defer(c, error); throw error; }
     if (recovery && (context.sessionId !== recovery.sessionId || context.capabilities.canStart || !context.capabilities.canSubmit)) throw new Error('LOCAL_EVIDENCE_MISMATCH');
+    return this.bind(c, context);
+  }
+  // Modo aula: mismo ciclo que el código, pero el servidor elige el código del juego activo del estudiante.
+  async claimAula(ticket: string, taskId: string): Promise<AnyContext> {
+    this.requireOnline();
+    const pending = (await this.db.all<Credential>('credentials')).find(c => c.phase === 'CLAIMING' && !c.operationBlocked && c.access?.kind === 'AULA' && c.access.taskId === taskId);
+    if (pending?.lastErrorCode === 'RATE_LIMITED' && (pending.nextAttemptAt ?? 0) > Date.now()) throw new ApiError(429, 'RATE_LIMITED', pending.nextAttemptAt! - Date.now());
+    const c: Credential = pending ?? { key: `aula:${crypto.randomUUID()}`, claimId: crypto.randomUUID(), runtimeSecret: newSecret(), phase: 'CLAIMING', access: { kind: 'AULA', taskId } };
+    await this.db.put('credentials', c);
+    let context: AnyContext;
+    try { context = await this.api.aulaClaim(ticket, taskId, c.claimId, c.runtimeSecret); }
+    catch (error) { await this.defer(c, error); throw error; }
     return this.bind(c, context);
   }
   private async bind(c: Credential, context: AnyContext): Promise<AnyContext> {

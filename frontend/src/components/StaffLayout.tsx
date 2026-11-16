@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import fondo from '@/assets/fotos/lectura.webp';
+import logo from '@/assets/kudlab-logo-oscuro.png';
 
 // Fotografía de fondo: Gustavo Fring, Pexels 5621973 (licencia libre de Pexels).
 export function StaffLayout({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
@@ -8,7 +9,7 @@ export function StaffLayout({ children, wide = false }: { children: ReactNode; w
     <div className="auth-backdrop" aria-hidden="true" style={{ backgroundImage: `url(${fondo})` }} />
     <header className="auth-header">
       <div className="auth-header-inner">
-        <p className="auth-brand">Kudlab</p>
+        <p className="auth-brand"><span className="auth-logo"><img src={logo} alt="Kudlab" width={120} height={60} /></span></p>
         <p className="auth-caption">Acceso del profesorado</p>
       </div>
     </header>

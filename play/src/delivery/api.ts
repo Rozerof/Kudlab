@@ -65,6 +65,10 @@ export class Api {
   async aulaGames(ticket: string) {
     return aulaSessionSchema.omit({ ticket: true }).parse(await this.call('/access/aula/games', undefined, JSON.stringify({ ticket })));
   }
+  async aulaClaim(ticket: string, taskId: string, claimId: string, runtimeSecret: string): Promise<AnyContext> {
+    uuidV4.parse(claimId); secretSchema.parse(runtimeSecret);
+    return this.verifiedContext(await this.call('/access/aula/claim', undefined, JSON.stringify({ ticket, taskId, claimId, runtimeSecret })));
+  }
   async aulaCode(ticket: string, taskId: string) {
     return z.object({ code: z.string().regex(/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{5}$/) }).parse(await this.call('/access/aula/code', undefined, JSON.stringify({ ticket, taskId }))).code;
   }

@@ -4819,6 +4819,24 @@ paths:
         '409': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
         '429': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
         '503': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+  /api/v1/game-runtime/access/aula/claim:
+    post:
+      operationId: claimClassroomGame
+      summary: Canjear un juego activo con el ticket de aula
+      description: >-
+        Con el ticket de aula, el juego elegido, claimId y secreto de 256 bits devuelve el mismo contexto que el canje por código. Usa el límite por IP del modo aula (toda la clase comparte IP) y el límite por código; reintentar con el mismo claimId es idempotente.
+      tags: [ Accesos ]
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: Respuesta confirmada; no-store., content: { application/json: { schema: { type: object } } } }
+        '400': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '401': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '403': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '404': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '409': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '429': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
+        '503': { description: Error sin datos ajenos., content: { application/json: { schema: { $ref: '#/components/schemas/GameError' } } } }
   /api/v1/game-runtime/access/aula/code:
     post:
       operationId: issueClassroomGameCode

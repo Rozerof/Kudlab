@@ -81,7 +81,7 @@ export function Students({ api, group, write, reviewed, aula }: { api: StudentsA
         <Table aria-label="Estudiantes de tus grupos" className="min-w-[38rem]"><TableHeader><TableRow><TableHead>Código</TableHead><TableHead>Seudónimo</TableHead><TableHead>Iniciales o referencia</TableHead><TableHead>Estado</TableHead>{course && <><TableHead>Apodo</TableHead><TableHead>Prioridad de revisión</TableHead></>}<TableHead>Ficha</TableHead></TableRow></TableHeader>
           <TableBody>{query.result.data.items.map((student) => <TableRow key={student.id}>
             <TableCell>{student.studentCode}</TableCell><TableCell>{student.firstName}</TableCell><TableCell>{student.lastName}</TableCell><TableCell className="whitespace-nowrap">{student.isActive ? 'Activo' : 'Inactivo'}</TableCell>
-            {course && <><TableCell className="font-semibold">{aliases.get(student.id) ?? <span className="text-sm text-muted font-normal">Sin apodo</span>}</TableCell><TableCell><PriorityStar priority={priorities.get(student.id)} /></TableCell></>}
+            {course && <><TableCell className="font-semibold whitespace-nowrap">{aliases.get(student.id) ?? <span className="text-sm text-muted font-normal">Sin apodo</span>}</TableCell><TableCell><PriorityStar priority={priorities.get(student.id)} /></TableCell></>}
             <TableCell><a href={detailPath(student.id, group?.id)} onClick={navigate} className="staff-link whitespace-nowrap" aria-label={`Ver ficha de ${student.firstName} ${student.lastName}, código ${student.studentCode}`}>Ver ficha</a></TableCell>
           </TableRow>)}</TableBody></Table>
       </div><ul className="accounts-list-view" aria-label="Estudiantes de tus grupos">{query.result.data.items.map((student) => <li key={student.id}>
@@ -182,11 +182,11 @@ export function StudentDetail({ api, readApi, activities, consents, observations
         onChange={change => { if (activeSequence === sequence.current && lease.valid() && change.studentId === studentId) query.reload(); }} />}
       </Section>
       {aula && <Section title="Acceso a los juegos (apodo y figura)" hint={student.isActive ? undefined : 'Inactivo'}><StudentPlayAccess api={aula} student={student} /></Section>}
-      {aula && <Section title="Panel de observación (0 a 5)"><ObservationPanel api={aula} student={student} /></Section>}
       <Section title="Actividades digitales">
       <StudentAssignments key={student.id} api={activities} student={student} refresh={refresh} />
       </Section>
-      <Section title="Observaciones docentes">
+      {aula && <Section title="Panel de observación (0 a 5)" open><ObservationPanel api={aula} student={student} /></Section>}
+      <Section title="Observaciones puntuales (conducta y frecuencia)">
       {lease && <StudentObservations key={`observations:${apiOrigin}:${actorId}:${student.id}:${student.groupId}`} api={observations} apiOrigin={apiOrigin} actorId={actorId} student={student} refresh={refresh} consentState={snapshot?.consent.state} draft={lease.slot('observations')} lease={lease} recheck={recheckSelection} onAccessLost={lostSelection} />}
       </Section>
       <Section title="Notas académicas">

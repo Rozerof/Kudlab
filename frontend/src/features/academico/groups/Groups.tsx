@@ -42,7 +42,7 @@ export function Groups({ api, admin, write, reviewed }: { api: GroupsApi; admin:
       {write?.phase === 'uncertain' && <Notice title="Revisa los cursos antes de volver a guardar"><p>El listado acaba de consultarse. Si creaste un curso, verifica si ya aparece; si editaste o eliminaste uno, abre su ficha para comprobar el resultado.</p><Button variant="outline" className="mt-4" onClick={reviewed}>Ya revisé los cursos</Button></Notice>}
       {!query.result.data.items.length ? <Notice title={admin ? 'Todavía no hay cursos' : 'Aún no tienes cursos asignados'}><p>{admin ? 'Crea un curso y selecciona su profesor responsable para empezar.' : 'Cuando el administrador te asigne un curso, aparecerá aquí.'}</p></Notice> :
         <ul className="courses-grid" aria-label="Cursos disponibles">{query.result.data.items.map(group => <li key={group.id}><Card className="course-card">
-          <div className="course-cover"><h2>{group.name}</h2></div>
+          <div className="course-cover"><span className="course-cover-grade" aria-hidden="true">{group.grade}°</span><h2>{group.name}</h2></div>
           <CardContent><p className="font-medium">Grado {group.grade} <span aria-hidden="true">·</span> Año {group.schoolYear}</p><div><p className="text-sm text-muted">Profesor responsable</p><p className="mt-1 font-medium [overflow-wrap:anywhere]">{group.teacherName}</p></div></CardContent>
           <CardFooter><CourseLink href={groupPath(group.id)}>Abrir curso<ArrowRight aria-hidden="true" /></CourseLink>{admin && <a className="staff-link" href={`${groupPath(group.id)}/editar`} onClick={navigate}>Editar curso</a>}</CardFooter>
         </Card></li>)}</ul>}

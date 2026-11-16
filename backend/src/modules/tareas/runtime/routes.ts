@@ -74,7 +74,7 @@ export function createGameRoutes(deps: GameDependencies = {}) {
       try { ip = getConnInfo(c).remote.address; } catch { /* In-process test requests have no socket. */ }
       if (!ip && deps.testParticipation) { assertTestDatabase(); ip = 'synthetic-in-process'; }
       if (!ip) throw new GameError(503, 'UNAVAILABLE');
-      const wait = await accessLimit(ip, 'ip'); if (wait) throw new GameError(429, 'RATE_LIMITED', undefined, wait);
+      const wait = await accessLimit(ip, c.req.path.startsWith('/api/v1/game-runtime/access/aula/') ? 'aula' : 'ip'); if (wait) throw new GameError(429, 'RATE_LIMITED', undefined, wait);
       await next(); return;
     }
     const token = c.req.header('Authorization') ?? '';
@@ -88,6 +88,7 @@ export function createGameRoutes(deps: GameDependencies = {}) {
   runtime.get('/access/aula/groups', async c => { empty(c); return c.json(await service.aulaGroups()); });
   runtime.post('/access/aula/identify', async c => { empty(c); return c.json(await service.aulaIdentify(await body(c, 4096))); });
   runtime.post('/access/aula/games', async c => { empty(c); return c.json(await service.aulaGames(await body(c, 4096))); });
+  runtime.post('/access/aula/claim', async c => { empty(c); return c.json(await service.aulaClaim(await body(c, 4096))); });
   runtime.post('/access/aula/code', async c => { empty(c); return c.json(await service.aulaCode(await body(c, 4096))); });
   runtime.post('/access/claim', async c => { empty(c); return c.json(await service.accessClaim(await body(c, 4096))); });
   runtime.post('/access/recover', async c => { empty(c); return c.json(await service.accessClaim(await body(c, 4096), true)); });

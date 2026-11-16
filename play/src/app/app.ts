@@ -429,8 +429,7 @@ export class App {
     if (!navigator.onLine) { feedback.textContent = 'Necesitamos conexión para abrir el juego.'; return; }
     this.claiming = true; play.disabled = true; feedback.textContent = 'Abriendo el juego…';
     try {
-      const code = await this.api.aulaCode(this.aula.ticket, taskId);
-      const context = await this.session.claimCode(code);
+      const context = await this.session.claimAula(this.aula.ticket, taskId);
       if (isExternal(context)) { this.claiming = false; await this.runExternal(context); return; }
       if (!supported(context)) throw new Error('VERSION_UNSUPPORTED');
       this.context = context; this.launchBound = true; this.lastOut = undefined; this.deliveryState = 'PENDING'; this.screen = 'instructions'; this.status = 'Tu actividad está lista'; this.problem = ''; this.render(true);

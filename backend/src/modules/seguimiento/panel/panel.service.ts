@@ -77,7 +77,7 @@ const METRICS: Record<string, { label: string; better: 'up' | 'down'; unit: 'pts
   omission_rate_pct: { label: 'las omisiones', better: 'down', unit: 'pts' }, commission_rate_pct: { label: 'las respuestas impulsivas', better: 'down', unit: 'pts' },
   error_rate_pct: { label: 'los errores', better: 'down', unit: 'pts' }, order_error_rate_pct: { label: 'los errores de orden', better: 'down', unit: 'pts' },
 };
-const LIMITS = { pts: { mild: 8, strong: 15 }, items: { mild: 1, strong: 2 }, panel: { mild: 0.75, strong: 1.5 } };
+const LIMITS = { pts: { mild: 10, strong: 20 }, items: { mild: 1, strong: 2 }, panel: { mild: 0.75, strong: 1.5 } };
 const BLOCK_NAMES: Record<Block, string> = { A: 'atención sostenida', B: 'atención selectiva', C: 'memoria de trabajo', D: 'memoria de secuencias', E: 'persistencia' };
 type Change = { strength: 'mild' | 'strong'; size: number; message: string };
 export type Priority = { studentId: string; level: 'AL_DIA' | 'REVISAR' | 'PRIORIDAD' | 'INSUFICIENTE'; message: string; changes: string[] };

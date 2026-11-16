@@ -67,5 +67,14 @@ export function Dashboard({ user }: { user: Identity }) {
         <CardContent><dl className="account-facts"><div><dt>Nombre</dt><dd>{user.name}</dd></div><div><dt>Correo</dt><dd>{user.email}</dd></div><div><dt>Rol</dt><dd>{roleLabel[user.role]}</dd></div></dl>
         </CardContent></Card>
     </div>
+    {user.role === 'TEACHER' && <section className="dashboard-steps" aria-labelledby="dashboard-steps-title">
+      <h2 id="dashboard-steps-title" className="staff-section-title">Una clase con Kudlab, en cuatro pasos</h2>
+      <ol>{[
+        ['🔑', 'Apodo y figura', 'En la ficha de cada estudiante asigna su apodo y su figura secreta. Se usan siempre.'],
+        ['🎮', 'Activa los juegos', 'En el curso, abre el modo aula y activa los juegos para todo el curso o para algunos estudiantes.'],
+        ['😄', 'Observa en clase', 'Registra el panel de observación de 0 a 5 en menos de tres minutos por estudiante.'],
+        ['⭐', 'Revisa la estrella', 'La estrella del listado te dice a quién mirar primero. Prioridad de revisión, no diagnóstico.'],
+      ].map(([icon, title, text], i) => <li key={title}><span className="dashboard-step-icon" aria-hidden="true">{icon}</span><p className="dashboard-step-number">Paso {i + 1}</p><h3>{title}</h3><p>{text}</p></li>)}</ol>
+    </section>}
   </div>;
 }

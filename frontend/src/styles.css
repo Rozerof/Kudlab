@@ -442,3 +442,40 @@ body { font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; -w
 .panel-bar > span { display: block; height: .55rem; border-radius: 999px; background: #5b7088; flex: none; max-width: 5rem; min-width: .2rem; }
 .panel-bar b { font-variant-numeric: tabular-nums; }
 @media (max-width: 640px) { .panel-dots { grid-template-columns: repeat(6, 2.6rem); } .panel-dot { width: 2.6rem; height: 2.6rem; } .figure-picker { grid-template-columns: repeat(4, minmax(0, 1fr)); } .aula-roster li { grid-template-columns: 1fr 1fr; } }
+
+/* ---------- Acabado visual (15-11-2026) ---------- */
+.auth-logo { display: inline-flex; align-items: center; background: #1c2e57; border-radius: .875rem; padding: .25rem .9rem; box-shadow: 0 6px 16px -8px rgb(28 46 87 / 60%); }
+.auth-logo img { height: 3.75rem; width: auto; margin-block: -.4rem; }
+/* Cursos: portada con color propio y grado destacado */
+.course-cover { position: relative; overflow: hidden; background: linear-gradient(135deg, var(--c1, #12726a), var(--c2, #1d9a8b)); }
+.course-cover::after { content: ''; position: absolute; right: -2.5rem; top: -2.5rem; width: 9rem; height: 9rem; border-radius: 50%; background: rgb(255 255 255 / 12%); }
+.course-cover-grade { position: absolute; right: 1.25rem; bottom: .75rem; font-size: 2.75rem; font-weight: 800; line-height: 1; color: rgb(255 255 255 / 30%); }
+.courses-grid > li:nth-child(4n+2) .course-cover { --c1: #1c2e57; --c2: #3a5aa8; }
+.courses-grid > li:nth-child(4n+3) .course-cover { --c1: #7a3fa0; --c2: #b06ad1; }
+.courses-grid > li:nth-child(4n+4) .course-cover { --c1: #c2572b; --c2: #e98a4f; }
+.course-card { transition: transform 160ms, box-shadow 160ms; }
+.course-card:hover { transform: translateY(-3px); box-shadow: 0 16px 32px -18px rgb(28 46 87 / 45%); }
+/* Modo aula: juegos en dos columnas en pantallas anchas */
+@media (min-width: 64rem) { .aula-games-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.aula-game-row { border-left: 6px solid var(--g, #53c0f3); }
+.aula-game-row:nth-child(4n+2) { --g: #f2a7c3; } .aula-game-row:nth-child(4n+3) { --g: #b9a6f2; } .aula-game-row:nth-child(4n+4) { --g: #9fdcc4; }
+.aula-panel-head h2 { font-size: 1.25rem; }
+/* Indicadores: pestañas por juego */
+.game-tabs { display: flex; flex-wrap: wrap; gap: .5rem; }
+.game-tab { display: inline-flex; align-items: center; gap: .5rem; min-height: 2.75rem; padding: .4rem 1rem; border-radius: 999px; border: 1.5px solid var(--border); background: #fff; font-weight: 600; color: var(--foreground); transition: background-color 150ms, border-color 150ms; }
+.game-tab:hover { border-color: #1c2e57; }
+.game-tab[aria-selected='true'] { background: #1c2e57; border-color: #1c2e57; color: #fff; }
+.game-tab-code { font-size: .75rem; font-weight: 700; padding: .05rem .45rem; border-radius: 999px; background: var(--g, #e6f4fc); color: #1c2e57; }
+.game-tab-TG-02 { --g: #fbe1ec; } .game-tab-TG-03 { --g: #ece6fc; } .game-tab-TG-04 { --g: #e1f5ec; }
+/* Secciones de la ficha con un poco más de presencia */
+.student-section { box-shadow: 0 1px 2px rgb(28 46 87 / 5%); transition: box-shadow 150ms; }
+.student-section[open] { box-shadow: 0 10px 28px -20px rgb(28 46 87 / 40%); }
+.student-section-summary:hover { background: #f7f9fc; border-radius: .875rem; }
+.dashboard-steps { margin-top: 2rem; }
+.dashboard-steps ol { list-style: none; padding: 0; margin: 1rem 0 0; display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); }
+.dashboard-steps li { position: relative; padding: 1.25rem; border-radius: 1rem; background: #fff; border: 1px solid var(--border); box-shadow: 0 10px 28px -22px rgb(28 46 87 / 45%); }
+.dashboard-steps h3 { font-weight: 700; margin-top: .15rem; }
+.dashboard-steps li p:last-child { color: var(--muted-foreground); font-size: .9375rem; margin-top: .35rem; }
+.dashboard-step-icon { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: .875rem; background: #eef6fd; font-size: 1.4rem; margin-bottom: .6rem; }
+.dashboard-steps li:nth-child(2) .dashboard-step-icon { background: #fbe9f1; } .dashboard-steps li:nth-child(3) .dashboard-step-icon { background: #fff4d6; } .dashboard-steps li:nth-child(4) .dashboard-step-icon { background: #ece6fc; }
+.dashboard-step-number { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #c2572b; }

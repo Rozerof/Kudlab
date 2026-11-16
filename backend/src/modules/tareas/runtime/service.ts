@@ -622,6 +622,16 @@ export function createGameService(deps: GameDependencies = {}) {
         throw error;
       }
     },
+    // Canje directo del modo aula: no pasa por el límite estricto por IP de /access/claim (toda la clase comparte IP).
+    // Reintentar con el mismo claimId reutiliza el código ya canjeado, sin descartar la sesión preparada.
+    async aulaClaim(this: { aulaCode(p: unknown): Promise<{ code: string }>; accessClaim(p: unknown): Promise<unknown> }, payload: unknown) {
+      accessSettings();
+      const input = z.strictObject({ ticket: ticketInput, taskId: z.enum(AULA_TASKS), claimId: uuidV4, runtimeSecret: secret }).parse(payload);
+      readTicket(input.ticket);
+      const [previous] = await db.select({ c: accessCodes }).from(accessClaims).innerJoin(accessCodes, eq(accessCodes.id, accessClaims.codeId)).where(eq(accessClaims.claimId, input.claimId));
+      const code = previous ? openCode(previous.c.secretCiphertext, previous.c.encryptionKeyId, aad(previous.c)) : (await this.aulaCode({ ticket: input.ticket, taskId: input.taskId })).code;
+      return this.accessClaim({ code, claimId: input.claimId, runtimeSecret: input.runtimeSecret });
+    },
     async createAssignment(actor: AcademicActor, payload: unknown) {
       const input = createInput.parse(payload), { requestId, ...content } = input;
       return withAcademicAccess(actor, async tx => {

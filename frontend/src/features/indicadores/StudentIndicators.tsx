@@ -1,4 +1,4 @@
-import { useEffect, useId, useReducer, useState } from 'react';
+import { useEffect, useId, useReducer, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,14 +45,23 @@ export function StudentIndicators({ api, studentId, studentName, groupId, onReva
     dispatch({ type: 'load', key, append: true });
     void api.history(studentId, apiFilter, new AbortController().signal, state.nextCursor).then(result => dispatch({ type: 'result', key, append: true, result }));
   };
-  const change = (patch: Partial<Filters>) => setFilters(f => ({ ...f, ...patch }));
+  const change = (patch: Partial<Filters>) => { explored.current = true; setFilters(f => ({ ...f, ...patch })); };
+  // Al abrir, si la primera actividad no tiene sesiones, se muestra la siguiente que sí tenga (sin que la docente busque).
+  const explored = useRef(false);
+  useEffect(() => {
+    if (explored.current || state.key !== key || state.status !== 'empty') return;
+    const next = taskIds[taskIds.indexOf(filters.task) + 1];
+    if (next) setFilters(f => ({ ...f, task: next })); else explored.current = true;
+  }, [state.status, state.key, key, filters.task]);
   const isDefault = filters.task === defaults.task && filters.metric === defaults.metric && filters.scope === defaults.scope && !filters.from && !filters.to;
   return <div className="staff-stack">
     <Heading>Historia de indicadores</Heading>
     <p>{studentName} · {filters.task} {taskTitles[filters.task]}</p>
     <PedagogicalNotice />
+    <div className="game-tabs" role="tablist" aria-label="Actividad">{taskIds.map(t => <button key={t} type="button" role="tab" aria-selected={filters.task === t} className={`game-tab game-tab-${t}`}
+      onClick={() => change({ task: t, metric: 'all', scope: 'SESSION' })}><span className="game-tab-code">{t}</span>{taskTitles[t]}</button>)}</div>
     <form className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Filtros de la historia" onSubmit={e => e.preventDefault()}>
-      <div className="grid gap-2"><Label htmlFor={ids.task}>Actividad</Label>
+      <div className="grid gap-2 sr-only"><Label htmlFor={ids.task}>Actividad</Label>
         <select id={ids.task} className={select} value={filters.task} onChange={e => change({ task: e.target.value as TaskId, metric: 'all', scope: 'SESSION' })}>{taskIds.map(t => <option key={t} value={t}>{t} · {taskTitles[t]}</option>)}</select></div>
       <div className="grid gap-2"><Label htmlFor={ids.metric}>Indicador</Label>
         <select id={ids.metric} className={select} value={filters.metric} onChange={e => change({ metric: e.target.value as Filters['metric'] })}>
