@@ -14,7 +14,8 @@ export type Priority = { studentId: string; level: PriorityLevel; message: strin
 export type BlockKey = 'A' | 'B' | 'C' | 'D' | 'E';
 export type BlockSummary = { status: 'OK' | 'INSUFFICIENT'; average: number | null; answered: number };
 export type Panel = { id: string; period: string; observedOn: string; area: 'LECTURA' | 'MATEMATICAS' | 'AMBAS'; responses: Record<string, number | null>; notes: Partial<Record<BlockKey, string>>; createdAt: string; blocks: Record<BlockKey, BlockSummary> };
-export type PanelList = { items: Panel[]; periods: { period: string; observedOn: string; blocks: Record<BlockKey, BlockSummary> }[] };
+export type GameContext = { taskId: string; title: string; label: string; unit: string; value: number; at: string };
+export type PanelList = { items: Panel[]; periods: { period: string; observedOn: string; blocks: Record<BlockKey, BlockSummary> }[]; games?: Partial<Record<BlockKey, GameContext>> };
 export type PanelInput = { requestId: string; period: string; observedOn: string; area: Panel['area']; responses: Record<string, number | null>; notes: Partial<Record<BlockKey, string>> };
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

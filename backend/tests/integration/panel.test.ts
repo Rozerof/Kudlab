@@ -43,6 +43,7 @@ describe('Panel de observación docente', () => {
     const list = await call(`/students/${id}/observation-panels`, undefined, t, 'GET');
     expect(list.body.items).toHaveLength(2);
     expect(list.body.periods.map((p: { period: string }) => p.period)).toEqual(['2026-P3', '2026-P4']);
+    expect(list.body.games).toEqual({});
     const star = await call(`/groups/${f.student.groupId}/review-priority`, undefined, t, 'GET');
     expect(star.status, JSON.stringify(star.body)).toBe(200);
     expect(star.body.items.find((i: { studentId: string }) => i.studentId === id)).toMatchObject({ level: 'PRIORIDAD' });

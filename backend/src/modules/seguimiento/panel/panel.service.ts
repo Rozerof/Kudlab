@@ -62,11 +62,31 @@ export async function createPanel(actor: AcademicActor, studentId: string, paylo
     return { repeated: false, detail: dto(row!) };
   });
 }
+// Indicador del juego con el que se contrasta cada bloque (documento del panel, sección 4). Bloque E: transversal, sin uno solo.
+const BLOCK_GAME: Partial<Record<Block, { taskId: string; metric: string; label: string; unit: '%' | 'items' }>> = {
+  A: { taskId: 'TG-01', metric: 'commission_rate_pct', label: 'la tasa de comisión', unit: '%' },
+  B: { taskId: 'TG-02', metric: 'precision_pct', label: 'la precisión', unit: '%' },
+  C: { taskId: 'TG-03', metric: 'precision_pct', label: 'la precisión', unit: '%' },
+  D: { taskId: 'TG-04', metric: 'longest_correct_length', label: 'la serie más larga recordada', unit: 'items' },
+};
+async function gameContext(tx: Tx, studentId: string) {
+  const out: Partial<Record<Block, { taskId: string; title: string; label: string; unit: string; value: number; at: string }>> = {};
+  for (const [block, g] of Object.entries(BLOCK_GAME) as [Block, NonNullable<(typeof BLOCK_GAME)[Block]>][]) {
+    const [row] = await tx.select({ value: calculatedIndicators.value, at: gameSessions.startedAtServer, title: tasks.title }).from(gameSessions)
+      .innerJoin(tasks, eq(tasks.id, gameSessions.taskId))
+      .innerJoin(calculationRuns, and(eq(calculationRuns.sessionId, gameSessions.id), eq(calculationRuns.status, 'SUCCEEDED')))
+      .innerJoin(calculatedIndicators, and(eq(calculatedIndicators.runId, calculationRuns.id), eq(calculatedIndicators.scope, 'SESSION'), eq(calculatedIndicators.status, 'CALCULATED'), eq(calculatedIndicators.metricCode, g.metric)))
+      .where(and(eq(gameSessions.studentId, studentId), eq(gameSessions.taskId, g.taskId), isNotNull(gameSessions.startedAtServer)))
+      .orderBy(desc(gameSessions.startedAtServer), desc(calculationRuns.runNumber)).limit(1);
+    if (row) out[block] = { taskId: g.taskId, title: row.title, label: g.label, unit: g.unit, value: Number(row.value), at: row.at!.toISOString() };
+  }
+  return out;
+}
 export async function listPanels(actor: AcademicActor, studentId: string) {
   return withAcademicAccess(actor, async tx => {
     await ownStudent(tx, actor, studentId);
     const rows = await tx.select().from(observationPanels).where(eq(observationPanels.studentId, studentId)).orderBy(desc(observationPanels.observedOn), desc(observationPanels.createdAt)).limit(200);
-    return { items: rows.map(dto), periods: byPeriod(rows) };
+    return { items: rows.map(dto), periods: byPeriod(rows), games: await gameContext(tx, studentId) };
   });
 }
 

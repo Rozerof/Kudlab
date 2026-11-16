@@ -37,6 +37,7 @@ const QUESTION_IDS = PANEL_BLOCKS.flatMap(b => b.questions.map(q => q[0]));
 const AREAS = [['AMBAS', 'Ambas'], ['LECTURA', 'Lectura'], ['MATEMATICAS', 'Matemáticas']] as const;
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const periodFor = (date: string) => `${date.slice(0, 4)}-P${Math.min(4, Math.floor((Number(date.slice(5, 7)) - 1) / 3) + 1)}`;
+const gameValue = (g: { value: number; unit: string }) => g.unit === '%' ? `${decimal(g.value)} %` : `${Math.round(g.value)} elementos`;
 const decimal = (n: number) => n.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 type Answer = number | null | undefined; // undefined = sin responder; null = «No lo he observado»
 type Draft = { period: string; observedOn: string; area: Panel['area']; answers: Record<string, Answer>; notes: Partial<Record<BlockKey, string>>; requestId: string };
@@ -126,21 +127,21 @@ function PanelSummary({ data }: { data: PanelList }) {
     if (periods.length < 2) return '';
     const [prev, last] = periods.slice(-2) as [PanelList['periods'][number], PanelList['periods'][number]];
     const parts = (Object.keys(BLOCK_SHORT) as BlockKey[]).flatMap(b => {
-      const x = prev.blocks[b].average, y = last.blocks[b].average;
-      return x !== null && y !== null && Math.abs(x - y) >= 0.5 ? [`En el bloque ${b} registró un promedio de ${decimal(y)} en ${last.period}, frente a ${decimal(x)} en ${prev.period}.`] : [];
+      const x = prev.blocks[b].average, y = last.blocks[b].average, g = data.games?.[b];
+      return x !== null && y !== null && Math.abs(x - y) >= 0.5 ? [`En el bloque ${b} la docente registró un promedio de ${decimal(y)} en ${last.period}, frente a ${decimal(x)} en ${prev.period}.${g ? ` En ${g.taskId} ${g.title} ${g.label} fue ${gameValue(g)} en la última partida.` : ''}`] : [];
     });
-    return parts.join(' ');
-  }, [periods]);
+    return parts.length ? `${parts.join(' ')} Se sugiere revisar las condiciones de aplicación.` : '';
+  }, [periods, data.games]);
   if (!periods.length) return <p className="text-sm text-muted">Aún no hay observaciones registradas con el panel 0–5.</p>;
   return <div className="staff-stack">
     <div className="staff-table-region" role="region" aria-label="Resumen del panel por bloque y periodo" tabIndex={0}>
-      <table className="panel-summary"><thead><tr><th scope="col">Bloque</th>{periods.map(p => <th key={p.period} scope="col">{p.period.replace('-P', ' P')}</th>)}</tr></thead>
+      <table className="panel-summary"><thead><tr><th scope="col">Bloque</th>{periods.map(p => <th key={p.period} scope="col">{p.period.replace('-P', ' P')}</th>)}<th scope="col">Juego relacionado (última partida)</th></tr></thead>
         <tbody>{(Object.keys(BLOCK_SHORT) as BlockKey[]).map(b => <tr key={b}><th scope="row">{BLOCK_SHORT[b]}</th>{periods.map(p => {
           const v = p.blocks[b];
           return <td key={p.period}>{v.status === 'OK' && v.average !== null ? <span className="panel-bar"><span style={{ width: `${v.average}rem` }} /><b>{decimal(v.average)}</b></span> : <span className="text-xs text-muted">Datos insuficientes</span>}</td>;
-        })}</tr>)}</tbody></table>
+        })}<td className="text-sm">{(() => { const g = data.games?.[b]; return g ? <><span className="font-medium">{g.title}</span>: {g.label} {gameValue(g)}</> : b === 'E' ? <span className="text-muted">Transversal: estado de las sesiones</span> : <span className="text-muted">Sin partidas</span>; })()}</td></tr>)}</tbody></table>
     </div>
-    {text && <p className="text-sm">{text} Se sugiere contrastarlo con los indicadores del juego relacionado.</p>}
-    <p className="text-xs text-muted">Promedio por bloque (0 a 5) del registro más reciente de cada periodo. Un bloque se muestra con al menos 2 respuestas (el E, con 1). Sin puntaje global ni comparación entre estudiantes.</p>
+    {text && <p className="text-sm panel-support">{text}</p>}
+    <p className="text-xs text-muted">La observación se lee junto al indicador del juego, nunca en lugar de él. Promedio por bloque (0 a 5) del registro más reciente de cada periodo. Un bloque se muestra con al menos 2 respuestas (el E, con 1). Sin puntaje global ni comparación entre estudiantes.</p>
   </div>;
 }
